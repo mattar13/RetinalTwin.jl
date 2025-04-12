@@ -1,17 +1,10 @@
 using Revise
-using ElectroPhysiology, PhysiologyModeling
-#import ElectroPhysiology.addStimulus!
-#sing DiffEqParamEstim, Optimization
-using Statistics
-using Optimization, OptimizationBBO, OptimizationPRIMA, OptimizationOptimJL
 
-#Use these packages for plotting and saving
-using Pkg;Pkg.activate("test")
+using DigitalTwin
+
 using DataFrames, CSV
 
 #%% Open the data
-include("OpenData.jl")
-
 abm_fn = raw"E:\Data\ERG\Melanopsin Data\2022_04_21_MelCreAdult\Mouse2_Adult_MelCre\NoDrugs\Rods\nd1_1p_0000.abf"
 ab_fn = raw"E:\Data\ERG\Melanopsin Data\2022_04_21_MelCreAdult\Mouse2_Adult_MelCre\BaCl\Rods\nd1_1p_0000.abf"
 a_fn = raw"E:\Data\ERG\Melanopsin Data\2022_04_21_MelCreAdult\Mouse2_Adult_MelCre\BaCl_LAP4\Rods\nd1_1p_0000.abf"
@@ -27,7 +20,6 @@ photon_flux = 400.0
 println("Stimulus runs from $(stim_start) to $(stim_end)")
 
 #%%Open the initial parameters
-include("Models.jl")
 param_df = CSV.read(raw"E:\KozLearn\Standards\starting_params.csv", DataFrame)
 keys = param_df.Key
 p0 = param_df.Value
