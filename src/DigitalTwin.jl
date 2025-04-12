@@ -7,6 +7,7 @@ export getStimulusStartTime, getStimulusEndTime
 #Export necessary packages for modeling
 using DifferentialEquations
 export solve, ODEProblem, Tsit5
+export SteadyStateProblem
 
 #Export basic optimization packages
 using Optimization
@@ -16,7 +17,6 @@ export OprimizationProblem
 using OptimizationBBO, OptimizationPRIMA, OptimizationOptimJL
 export BBO_adaptive_de_rand_1_bin_radiuslimited, PRIMA, COBYLA, OptimizationOptimJL
 
-using DiffEqParamEstim #This is for parameter estimation
 using SciMLSensitivity #This is for sensitivity analysis
 
 #Use some statistics packages
