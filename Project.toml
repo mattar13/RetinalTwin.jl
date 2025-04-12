@@ -1,3 +1,14 @@
+name = "DigitalTwin"
+
 [deps]
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
+ElectroPhysiology = "da7a9670-f599-43ac-b818-143f8bf87d45"
+GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
 MLDatasets = "eb30cadb-4394-5ae3-aed4-317e484a6458"
+Optim = "429524aa-4258-5aef-a3af-852621145aeb"
+Optimization = "7f7a1694-90dd-40f0-9382-eb1efda571ba"
+PhysiologyPlotting = "d5a2a81f-3167-4eb5-8f67-b1ebe6a4430d"
 Pluto = "c3e4b0f8-55cb-11ea-2926-15256bba5781"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
