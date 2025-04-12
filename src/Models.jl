@@ -18,8 +18,27 @@ function photoreceptor_model!(du, u, p, t; stim_start = 0.0, stim_end = 1.0, pho
     cGMP = view(u, 8)
 
     #Extract the parameters
-    (αC, ) = p
-    dRh = aC*Stim(t, stim_start, stim_end, photon_flux) 
+    (   c_m,
+        αC, kR_f, kR_r1, kR_r2,
+        kT_f, kT_r, Tr_total, 
+        kPDE_f, kPDE_r, PDE_total, 
+        b, Jmax, kCa_f1, kCa_f2, kCa_r, C0, CaB_total, 
+        A_max, kCNG_f, kCNG_r1, kCNG_r2
+    ) = p
+
+    @. dV = -(ILeak(V) + Iphoto(V, cGMP, Jmax))/c_m
+    @. dRh = αC*Stim(t, stim_start, stim_end, photon_flux) - kR_f*Rh + kR_r1*Rhi
+    @. dRhi = kR_f*Rh - (kR_r1 + kR_r2)*Rhi
+    @. dTr = kT_f*Rh*(Tr_total - Tr) - kT_r*Tr - kPDE_f*Tr*(PDE_total - PDE)
+    @. dPDE = kPDE_f*Tr*(PDE_total - PDE) - kPDE_r*PDE
+
+    @. dCa = b*J(cGMP, Jmax) - kCa_f1*(Ca - C0) - kCa_f2*(CaB_total - CaB)*Ca + kCa_r*CaB
+    #@. dCa =  
+
+    @. dCaB = kCa_f2*(CaB_total - CaB)*Ca - kCa_r*CaB
+
+    @. dcGMP = A_max/(1.0 + (Ca/kCNG_f)^4)-cGMP*(kCNG_r1 + kCNG_r2*PDE)
+    nothing
 end
 
 
