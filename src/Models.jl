@@ -4,26 +4,16 @@ function phototransduction_ode!(du, u, p, t; stim_start = 0.0, stim_end = 1.0, p
     dT = view(du, 2)
     dP = view(du, 3)
     dG = view(du, 4)
-    dJ = view(du, 5)
-    dV = view(du, 6)
-
-    dA = view(du, 7)
+    dIPHOTO = view(du, 5)
 
     R = view(u, 1)
     T = view(u, 2)
     P = view(u, 3)
     G = view(u, 4)
-    J = view(u, 5)
-    V = view(u, 6)
-
-    A = view(u, 7)
+    IPHOTO = view(u, 5)
 
     #Open parameters
-    (
-        k, μRh, kACT, μTr, μPDE, μcGMP, V0,
-        C_m, gPHOTO, kg, gL, EL
-    ) = p
-    C_m = 20.0
+    (k, μRh, kACT, μTr, μPDE, μcGMP, V0, gPHOTO, kg) = p
 
     Φ = Stim(t, stim_start, stim_end, photon_flux)
     @. dR = k*Φ*(1-R) - μRh*R
@@ -31,10 +21,7 @@ function phototransduction_ode!(du, u, p, t; stim_start = 0.0, stim_end = 1.0, p
     @. dP = μTr*T*(1-P) - μPDE*P 
     @. dG = (V0 - G) - (μPDE+μcGMP)*P*G# - μcGMP*G # Non-linear degradation
 
-    @. dJ = -gPHOTO*J∞(G, kg)-J#*(1.0-exp((V-8.5)/17.0)) - J# # - iDARK
-    @. dV = -(I_LEAK(V, gL, -EL) + J)/C_m #(kP6*H_inf(J, l1, h1)^2*(1-H/ HMAX) - H)/τH #to add this or not *H_inf(J, l1, h1)
-
-    @. dA = 0.0#(J+H) - A
+    @. dIPHOTO = -gPHOTO*J∞(G, kg)-IPHOTO#*(1.0-exp((V-8.5)/17.0)) - J# # - iDARK
     return nothing
 end
 
