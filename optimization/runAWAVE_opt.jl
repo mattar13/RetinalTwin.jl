@@ -1,17 +1,13 @@
 using Revise
-using Pkg; Pkg.activate(".")
+using DigitalTwin
 using ElectroPhysiology
 using Statistics
 using Optimization, OptimizationBBO, OptimizationPRIMA, OptimizationOptimJL
 
-#Use these packages for plotting and saving
-using Pkg;Pkg.activate("test")
 using GLMakie, PhysiologyPlotting
 using DataFrames, CSV
 
 #%% Open the data
-include("OpenData.jl")
-
 a1_fn = raw"E:\Data\ERG\Retinoschisis\2022_07_11_Adult\Mouse1_Adult_WT\BaCl_LAP4\Rods\nd1_1p_0000.abf"
 a2_fn = raw"E:\Data\ERG\Retinoschisis\2022_07_11_Adult\Mouse1_Adult_WT\BaCl_LAP4\Rods\nd2_1p_0000.abf"
 a3_fn = raw"E:\Data\ERG\Retinoschisis\2022_07_11_Adult\Mouse1_Adult_WT\BaCl_LAP4\Rods\nd3_1p_0000.abf"
@@ -33,7 +29,6 @@ photon_flux = 400.0
 println("Stimulus runs from $(stim_start) to $(stim_end)")
 
 #%%Open the initial parameters
-include("Models.jl")
 param_df = CSV.read(raw"E:\KozLearn\Standards\starting_params.csv", DataFrame)
 keys = param_df.Key
 p0 = param_df.Value
@@ -56,9 +51,9 @@ end
 opt_func(p, t) = loss_graded(data_dict, p; channel = 3, stim_start = stim_start, stim_end = stim_end)[1]
 
 # #%% Optimize using Black Box Optimization
-# prob = OptimizationProblem(opt_func, p0, lb = lower_bounds, ub = upper_bounds)
-# sol_BBO = solve(prob, BBO_adaptive_de_rand_1_bin_radiuslimited(), callback = state_callback)
-# opt_params = sol_BBO.u
+prob = OptimizationProblem(opt_func, p0, lb = lower_bounds, ub = upper_bounds)
+sol_BBO = solve(prob, BBO_adaptive_de_rand_1_bin_radiuslimited(), callback = state_callback)
+opt_params = sol_BBO.u
 
 # # #%% Optimize using PRIMA/COBYLA
 optf = OptimizationFunction(opt_func, Optimization.AutoForwardDiff())
@@ -66,7 +61,7 @@ prob = OptimizationProblem(optf, opt_params, lb = lower_bounds, ub = upper_bound
 sol_opt = solve(prob, BOBYQA(), callback = state_callback)
 opt_params = sol_opt.u
 
-# Run the simulation
+#%% Run the simulation
 sim = []
 for (i, exp) in enumerate(data_series)
     sol_t = exp.t

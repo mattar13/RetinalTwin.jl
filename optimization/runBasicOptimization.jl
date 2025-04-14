@@ -1,120 +1,104 @@
 using Revise
-using ElectroPhysiology, DifferentialEquations
-#import ElectroPhysiology.addStimulus!
-using DiffEqParamEstim, Optimization
-using Statistics
-using Optim #Add to main package
-
-#Use these packages for plotting and saving
+using DigitalTwin
+import DigitalTwin: SteadyStateProblem
+import DigitalTwin: J
 using GLMakie, PhysiologyPlotting
+import DigitalTwin.AutoForwardDiff
 using DataFrames, CSV
 
 #%% Input the working data
-include("OpenData.jl")
-fn = raw"E:\Data\ERG\Retinoschisis\2021_05_27_RS1KO-30\Mouse1_Adult_RS1KO\NoDrugs\Rods\nd1_1p_0000.abf"
 fn = raw"E:\Data\ERG\Melanopsin Data\2022_04_21_MelCreAdult\Mouse2_Adult_MelCre\NoDrugs\Rods\nd1_1p_0000.abf"
 fn = raw"E:\Data\ERG\Melanopsin Data\2022_04_21_MelCreAdult\Mouse2_Adult_MelCre\BaCl_LAP4\Rods\nd1_1p_0000.abf"
+fn = raw"E:\Data\ERG\Retinoschisis\2021_05_27_RS1KO-30\Mouse1_Adult_RS1KO\NoDrugs\Rods\nd1_1p_0000.abf"
 
 dataERG, expERG = openData(fn)
 stim_start = getStimulusStartTime(dataERG)[1]*1000
 stim_end = getStimulusEndTime(dataERG)[1]*1000
-Stim(t) = stim_start <= t <= stim_end ? 400.0 : 0.0
+photon_flux = 400.0
 println("Stimulus runs from $(stim_start) to $(stim_end)")
 
-getchannel(dataERG, 1).data_array[1,:,1]
-
 #%% Set up the optimization problem
-include("Models.jl")
 param_df = CSV.read(raw"E:\KozLearn\Standards\starting_params.csv", DataFrame)
 keys = param_df.Key
 p0 = param_df.Value
 lower_bounds = param_df.LowerBounds
 upper_bounds = param_df.UpperBounds
+opt_params = deepcopy(p0) # This is the parameter set that will be optimizes
 
-#%% Maybe we can try to setup black box optim as a initial guess
-a_p0 = p0[[1:9..., 19:23...]]
+# Define the callback function
+function state_callback(state, l)
+    if state.iter % 25 == 1 
+        println("Iteration: $(state.iter), Loss: $l")
+    end
+    #If we start reaching a point where the lines become flat, we should stop
+    if state.iter > 10000
+        return true
+    else
+        return false
+    end
+end
+opt_func(p, t) = loss_static(dataERG, p; channel = 3, stim_start = stim_start, stim_end = stim_end, photon_flux = photon_flux)
+opt_func(opt_params, 0.0)
 
-#using BlackBoxOptim
-# --- Optimization settings---
-opt = Optim.Options(
-    #g_abstol = 1e-8, 
-    #g_reltol = 1e-8,
-    iterations = 100,
-    show_trace = true, 
-    show_every = 10
-)
+# # #%% Optimize using PRIMA/COBYLA
+optf = OptimizationFunction(opt_func, AutoForwardDiff())
+prob = OptimizationProblem(optf, opt_params, lb = lower_bounds, ub = upper_bounds)
+sol_opt = solve(prob, BOBYQA(), callback = state_callback)
+opt_params = sol_opt.u
 
-alg = Fminbox(BFGS())
-# Use Optim.jl to minimize the loss function with respect to parameters.
-result = optimize(y -> loss_static(dataERG, y), 
-    lower_bounds, upper_bounds, p0, 
-    alg, opt, autodiff = :forward
-)
+#%% Plot the ideal data
+sol, ERG_t = simulate_model(dataERG, opt_params; stim_start = stim_start, stim_end = stim_end, photon_flux = photon_flux);
+sol_t = dataERG.t
+j_t = map(t -> sol(t)[5], sol_t)
+h_t = map(t -> sol(t)[6], sol_t)
+a_wave = map(t -> sol(t)[7], sol_t)
+b_wave = map(t -> sol(t)[8], sol_t)
+m_wave = map(t -> sol(t)[9], sol_t)
+c_wave = map(t -> sol(t)[10], sol_t)
+o_wave = map(t -> sol(t)[14], sol_t)
+# sol_a, ERGa_t = simulate_awave(a_dataERG, opt_params);
+# sol_ab, ERGab_t = simulate_abwave(ab_dataERG, opt_params);
+# sol_t = abm_dataERG.t
 
-#Get the results
-opt_params = Optim.minimizer(result)
-# Extract the optimized parameters and print them.
-println("Optimized parameters: ", opt_params, "with loss of: ", loss_static(dataERG, opt_params))
-
-#%%
-#opt_params = p0
-#opt_params = [0.3932316550412567, 1.0260082770989687, 0.0003916972931226907, 800.0006939405749, 0.8939308786851997, 10.007262117944938, 100.04652651427836, 0.02854849213840683, 0.09999999972096212, 59.99999999999999, 3.328106018630575e-6, 3.5094030906847675, 9.559471340694554e-6, 0.1974602085556033, 0.5044543581561698, 0.5325954703755535, 1.0150865919213672, 0.2087574134432508, 14.866287408516474, 9.697855871116372, 38.8862854460252, 240.86751760640078, 44.68145218102656, 134.30804769035677, 519.2998392601478, 31816.756356838676, 199.9996841782422]
-
-#%% Process the plotting
-stim_t = map(x -> Stim(x), dataERG.t)
-sol, ERG_t = simulate_awave(dataERG.t, opt_params[[1:9..., 19:23...]], opt_params)
-sol_t = sol.t
-#Plot components
-a_t = map(t -> sol(t)[6], sol_t)
-b_t = map(t -> sol(t)[7], sol_t)
-m_t = map(t -> sol(t)[8], sol_t)
-c_t = map(t -> sol(t)[9], sol_t)
-o_t = map(t -> sol(t)[13], sol_t)
-#ERG_t = map(t->sol(t)[14], sol_t)
-
-# Plot the results
+# Start the plot for the realtime data
 fig = Figure(size = (1000, 600))
-ax1 = Axis(fig[1, 1], title = "ERG data collected"); hidedecorations!(ax1); hidespines!(ax1)
+
+ax1 = Axis(fig[1, 1], title = "BM-wave block"); hidespines!(ax1)
+ax2 = Axis(fig[2, 1], title = "M-wave Block"); hidespines!(ax2)
+ax3 = Axis(fig[3, 1], title = "No block");  hidespines!(ax3)
+ax1b = Axis(fig[1, 2], title = "A-wave sim")
+ax2b = Axis(fig[2, 2], title = "AB-wave sim");  hidespines!(ax2b)
+ax3b = Axis(fig[3, 2], title = "ABM-wave sim");  hidespines!(ax3b)
+ax1c = Axis(fig[1:3, 3], title = "Loss A");
+
+# experimentplot!(ax1, dataERG, channel = 3)
+# lines!(ax1, sol_t, a_wave, color = :red, label = "Simulated ERG", alpha = 0.2)
+# lines!(ax1, sol_t, j_t, color = :blue, label = "Simulated ERG", alpha = 0.2)
+# experimentplot!(ax2, ab_dataERG, channel = 3)
+# lines!(ax2, sol_t, a_wave .+ b_wave, color = :red, label = "Simulated ERG", alpha = 0.2)
 experimentplot!(ax1, dataERG, channel = 3)
-vlines!(ax1, [stim_end], color = :green, label = "Stimulus", alpha = 0.5)
-ylims!(ax1, (-1.0, 0.20))
-#Add all of the components together
+lines!(ax1, sol_t, ERG_t, color = :red, label = "Simulated ERG", alpha = 0.2)
 
-sb_x = 2500
-sb_y = 0.2
-sb_dx = 250
-sb_dy = 0.25
-lines!(ax1, [sb_x, sb_x+sb_dx], [sb_y, sb_y], color = :black, linewidth = 3)  # horizontal scale bar
-lines!(ax1, [sb_x, sb_x], [sb_y, sb_y+sb_dy], color = :black, linewidth = 3)  # vertical scale bar
-text!(ax1, sb_x-(sb_dx/3), sb_y + (sb_dy/2), text = "$(ceil(Int64, sb_dy*1000))μV", align = (:center, :center), rotation = π/2, color = :black, fontsize = 12.0, font = :bold)
-text!(ax1, sb_x+(sb_dx/2), sb_y - (sb_dy/3), text = "$(ceil(Int64, sb_dx)) ms", align = (:center, :center), color = :black, fontsize = 12.0, font = :bold)
+lines!(ax2b, sol_t, a_wave, color = :green, label = "Simulated ERG")
+lines!(ax2b, sol_t, b_wave, color = :blue, label = "Simulated ERG")
+lines!(ax2b, sol_t, a_wave .+ b_wave, color = :red, label = "Simulated ERG")
 
-ax2 = Axis(fig[1, 2], title = "Modelled Retina"); hidedecorations!(ax2); hidespines!(ax2)
-experimentplot!(ax2, dataERG, channel = 3)
-lines!(ax2, sol_t, ERG_t, color = :red, label = "Simulated ERG")
-vlines!(ax2, [stim_end], color = :green, label = "Stimulus", alpha = 0.5)
+lines!(ax3b, sol_t, a_wave, color = :green, label = "Simulated ERG")
+lines!(ax3b, sol_t, b_wave, color = :blue, label = "Simulated ERG")
+lines!(ax3b, sol_t, m_wave, color = :magenta, label = "Simulated ERG")
+lines!(ax3b, sol_t, o_wave, color = :cyan, label = "Simulated ERG")
+lines!(ax3b, sol_t, c_wave, color = :orange, label = "Simulated ERG")
+lines!(ax3b, sol_t, ERG_t, color = :red, label = "Simulated ERG")
+fig
+#%%
 
-sb_x = 2500
-sb_y = 0.2
-sb_dx = 250
-sb_dy = 0.25
-lines!(ax1, [sb_x, sb_x+sb_dx], [sb_y, sb_y], color = :black, linewidth = 3)  # horizontal scale bar
-lines!(ax1, [sb_x, sb_x], [sb_y, sb_y+sb_dy], color = :black, linewidth = 3)  # vertical scale bar
-text!(ax1, sb_x-(sb_dx/3), sb_y + (sb_dy/2), text = "$(ceil(Int64, sb_dy*1000))μV", align = (:center, :center), rotation = π/2, color = :black, fontsize = 12.0, font = :bold)
-text!(ax1, sb_x+(sb_dx/2), sb_y - (sb_dy/3), text = "$(ceil(Int64, sb_dx)) ms", align = (:center, :center), color = :black, fontsize = 12.0, font = :bold)
+linkyaxes!(ax1, ax1b)
+linkyaxes!(ax2, ax2b)
+linkyaxes!(ax3, ax3b)
 
-ax3 = Axis(fig[2,2]) ; hidedecorations!(ax3); hidespines!(ax3)
-lines!(ax3, [NaN], [NaN], color = :red, label = "Simulated ERG")
-lines!(ax3, [NaN], [NaN], color = :black, label = "Collected ERG")
-vlines!(ax3, [stim_end], linewidth = 2.0, color = :green, label = "Stimulus (1ms bright light)", alpha = 0.5)
-lines!(ax3, sol_t, a_t, linewidth = 2.0, color = :orange, label = "a-wave")
-lines!(ax3, sol_t, b_t, linewidth = 2.0, color = :blue, label = "b-wave")
-lines!(ax3, sol_t, m_t, linewidth = 2.0, color = :darkorchid, label = "Müller component")
-lines!(ax3, sol_t, c_t, linewidth = 2.0, color = :darkcyan, label = "c-wave")
-lines!(ax3, sol_t, o_t, color = :darkred, label = "OPs")
-linkxaxes!(ax1, ax2, ax3)
-linkyaxes!(ax1, ax2, ax3)
-Legend(fig[2,1], ax3, tellwidth = false, halign = :right)
+linkxaxes!(ax1, ax1b)
+linkxaxes!(ax2, ax2b) 
+linkxaxes!(ax3, ax3b)
 
 fig
 #%%

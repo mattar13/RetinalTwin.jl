@@ -1,7 +1,9 @@
 using Revise
-
 using DigitalTwin
-
+import DigitalTwin: SteadyStateProblem
+import DigitalTwin: J
+using GLMakie, PhysiologyPlotting
+import DigitalTwin.AutoForwardDiff
 using DataFrames, CSV
 
 #%% Open the data
@@ -39,20 +41,23 @@ function state_callback(state, l)
         return false
     end
 end
-
-opt_func(p, t) = loss_static(abm_dataERG, p; stim_start = stim_start, stim_end = stim_end, photon_flux = photon_flux)
-opt_func_full(p, t) = loss_static_full(a_dataERG, ab_dataERG, abm_dataERG, p; stim_start = stim_start, stim_end = stim_end, photon_flux = photon_flux)
-
+using Statistics
+opt_func_full(p, t) = loss_static_abm(a_dataERG, ab_dataERG, abm_dataERG, p; 
+    stim_start = stim_start, stim_end = stim_end, photon_flux = photon_flux
+)[1] |> sum
 #%% Optimize using Black Box Optimization
-prob = OptimizationProblem(opt_func_full, p0, lb = lower_bounds, ub = upper_bounds)
-sol_BBO = solve(prob, BBO_adaptive_de_rand_1_bin_radiuslimited(), callback = state_callback)
-opt_params = sol_BBO.u
+# prob = OptimizationProblem(opt_func_full, p0, lb = lower_bounds, ub = upper_bounds)
+# sol_BBO = solve(prob, BBO_adaptive_de_rand_1_bin_radiuslimited(), callback = state_callback)
+# opt_params = sol_BBO.u
+# opt_func_full(opt_params, 0.0)
 
-# #%% Optimize using PRIMA/COBYLA
-optf = OptimizationFunction(opt_func_full, Optimization.AutoForwardDiff())
+#%% Optimize using PRIMA/COBYLA
+optf = OptimizationFunction(opt_func_full, AutoForwardDiff())
 prob = OptimizationProblem(optf, opt_params, lb = lower_bounds, ub = upper_bounds)
+
 sol_opt = solve(prob, BOBYQA(), callback = state_callback)
 opt_params = sol_opt.u
+opt_func_full(opt_params, 0.0)
 
 #%% Plot the ideal data
 sol, ERG_t = simulate_model(abm_dataERG, opt_params; stim_start = stim_start, stim_end = stim_end, photon_flux = photon_flux);
@@ -64,26 +69,24 @@ b_wave = map(t -> sol(t)[8], sol_t)
 m_wave = map(t -> sol(t)[9], sol_t)
 c_wave = map(t -> sol(t)[10], sol_t)
 o_wave = map(t -> sol(t)[14], sol_t)
-# sol_a, ERGa_t = simulate_awave(a_dataERG, opt_params);
-# sol_ab, ERGab_t = simulate_abwave(ab_dataERG, opt_params);
-# sol_t = abm_dataERG.t
 
 # Start the plot for the realtime data
 fig = Figure(size = (1000, 600))
 
-ax1 = Axis(fig[1, 1], title = "BM-wave block"); hidedecorations!(ax1); hidespines!(ax1)
-ax2 = Axis(fig[2, 1], title = "M-wave Block"); hidedecorations!(ax2); hidespines!(ax2)
-ax3 = Axis(fig[3, 1], title = "No block"); hidedecorations!(ax3); hidespines!(ax3)
-ax1b = Axis(fig[1, 2], title = "A-wave sim")#; hidedecorations!(ax1b); hidespines!(ax1b)
-ax2b = Axis(fig[2, 2], title = "AB-wave sim"); hidedecorations!(ax2b); hidespines!(ax2b)
-ax3b = Axis(fig[3, 2], title = "ABM-wave sim"); hidedecorations!(ax3b); hidespines!(ax3b)
+ax1 = Axis(fig[1, 1], title = "BM-wave block"); hidespines!(ax1)
+ax2 = Axis(fig[2, 1], title = "M-wave Block"); hidespines!(ax2)
+ax3 = Axis(fig[3, 1], title = "No block"); hidespines!(ax3)
+ax1b = Axis(fig[1, 2], title = "A-wave sim"); hidespines!(ax1b)
+ax2b = Axis(fig[2, 2], title = "AB-wave sim"); hidespines!(ax2b)
+ax3b = Axis(fig[3, 2], title = "ABM-wave sim"); hidespines!(ax3b)
 ax1c = Axis(fig[1:3, 3], title = "Loss A");
 
 experimentplot!(ax1, a_dataERG, channel = 3)
 lines!(ax1, sol_t, a_wave, color = :red, label = "Simulated ERG", alpha = 0.2)
-lines!(ax1, sol_t, j_t, color = :blue, label = "Simulated ERG", alpha = 0.2)
+
 experimentplot!(ax2, ab_dataERG, channel = 3)
 lines!(ax2, sol_t, a_wave .+ b_wave, color = :red, label = "Simulated ERG", alpha = 0.2)
+
 experimentplot!(ax3, abm_dataERG, channel = 3)
 lines!(ax3, sol_t, ERG_t, color = :red, label = "Simulated ERG", alpha = 0.2)
 
