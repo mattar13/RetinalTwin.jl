@@ -28,10 +28,7 @@ function loss_static_abm(data_a, data_ab, data_abm, full_params; channel = 3, kw
     abm_wave = map(t -> sol(t)[15], data_abm.t)
     loss_abm = sum((abm_wave .- expERG_ABM).^2)#/length(abm_wave)
     #println("Loss ABM: $loss_abm")
-
-    sum_loss = loss_a + loss_ab + loss_abm
-    #println("Total Loss: $sum_loss")
-    return sum_loss
+    return loss_a, loss_ab, loss_abm
 end
 
 function loss_graded(data_series, params; channel = 1, stim_start = 0.0, stim_end = 1.0)
