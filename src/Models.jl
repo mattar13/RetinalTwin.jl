@@ -4,7 +4,7 @@ function phototransduction_ode!(du, u, p, t; stim_start = 0.0, stim_end = 1.0, p
     dT = view(du, 2)
     dP = view(du, 3)
     dG = view(du, 4)
-    dJ = view(du, 5)
+    dIPHOTO = view(du, 5)
     dH = view(du, 6)
 
     dA = view(du, 7)
@@ -13,7 +13,7 @@ function phototransduction_ode!(du, u, p, t; stim_start = 0.0, stim_end = 1.0, p
     T = view(u, 2)
     P = view(u, 3)
     G = view(u, 4)
-    J = view(u, 5)
+    IPHOTO = view(u, 5)
     H = view(u, 6)
 
     A = view(u, 7)
@@ -26,17 +26,31 @@ function phototransduction_ode!(du, u, p, t; stim_start = 0.0, stim_end = 1.0, p
     V0, gREST, l1, h1,
     gH, τH) = p
 
+    #CONSTANTS
+    G0 = 4.0
+    kg = 20.0
+    iDARK = 5040.0
+
     Φ=Stim(t, stim_start, stim_end, photon_flux)
     @. dR = aC*Φ - kR1*R
     @. dT = kF2*R*(1-T) - kR2*T
     @. dP = kF3*T*(1-P) - kR3*P
     @. dG = -kHYDRO*P*G + kREC*(G0 - G) # Non-linear degradation
 
-    @. dJ = -iDARK * J∞(G, kg) - J#( kP5*G*(1-J/-JMAX) - J)/τJ
+    @. dIPHOTO = -iDARK * J∞(G, kg) - J#( kP5*G*(1-J/-JMAX) - J)/τJ
     @. dH = (gH*H_inf(A, l1, h1)*(A-0.25) - H)/τH #0.0#(kP6*H_inf(J, l1, h1)^2*(1-H/ HMAX) - H)/τH #to add this or not *H_inf(J, l1, h1)
     R_m = 10
     E_REST = 0.0
+    
+    iALL = 
+    @. dV = -((J+V0)/R_m + H + gREST*(A-E_REST))/C_m
+    
+    
+    
     @. dA = -((J+V0)/R_m + H + gREST*(A-E_REST))/C_m 
+
+
+
     return nothing
 end
 
@@ -74,7 +88,7 @@ function erg_ode!(du, u, p, t; stim_start = 0.0, stim_end = 1.0, photon_flux = 4
     #Run phototransduction first
     phototransduction_ode!(du, u, photo_p, t; stim_start = stim_start, stim_end = stim_end, photon_flux = photon_flux)
 
-    @. dB = k1*(abs(A)^4) - B/τB #This is transfer from PC to BPC #*(-A^3) This nonlinear term may be taking away
+    @. dB = (k1*(abs(A)^4) - B)/τB #This is transfer from PC to BPC #*(-A^3) This nonlinear term may be taking away
     @. dM = (k2*A - k3*B - M)/τM
     @. dC = (-k4*A - C)/τC 
     
