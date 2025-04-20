@@ -1,6 +1,6 @@
 function phototransduction_ode!(du, u, p, t; stim_start = 0.0, stim_end = 1.0, photon_flux = 400.0)
     #Extract the parameters
-    dV = view(du, 1) #This is the voltage equation, but we are not using it in this model
+    dV = view(du, 1)
     
     dR = view(du, 2)
     dT = view(du, 3)
@@ -25,7 +25,7 @@ function phototransduction_ode!(du, u, p, t; stim_start = 0.0, stim_end = 1.0, p
     d_CaB_lf = view(du, 19)
     d_CaB_hf = view(du, 20)
 
-    V = view(u, 1) #This is the voltage equation, but we are not using it in this model
+    V = view(u, 1)
     
     R = view(u, 2)
     T = view(u, 3)
@@ -49,7 +49,7 @@ function phototransduction_ode!(du, u, p, t; stim_start = 0.0, stim_end = 1.0, p
     _CaB_ls = view(u, 17)
     _CaB_hs = view(u, 18)
     _CaB_lf = view(u, 19)
-    _CaB_hf = view(u, 18)
+    _CaB_hf = view(u, 20)
 
     #A = view(u, 8)
 
@@ -61,31 +61,35 @@ function phototransduction_ode!(du, u, p, t; stim_start = 0.0, stim_end = 1.0, p
     ) = p
 
     #CONSTANTS
-    G0 = 2.0
-    kg = 20.0
+    G0 = 4.0
+    kg = 20
     iDARK = 5040.0
     
+    #Stimulus
     Φ=Stim(t, stim_start, stim_end, photon_flux)
     
-    
+    #Currents
     iLEAK = iH = iKV = iCa = iKCa = iCl = iEX = iEX2 = 0.0 #Initialize the currents to zero
-    iPHOTO = @. -iDARK * J∞(G, kg)#* (1.0 - exp((V - 8.5) / 17.0))
-    iLEAK = @. gLEAK*(V+eLEAK) #Leak
-    iH =    @. gH*(O1 + O2 + O3)*(V + eH) #Ih Current
-    iKV =   @. gKV*mKV^3+hKV*(V + eK)
-    iCa =   @. gCa*mCa^4*hCa(V)*(V + eCa) #Ca current #We should add the log *log(_Ca_s/_Ca_0)
-    iKCa =  @. gKCa * mKCa^2 * mKCas(_Ca_s) * (V + eK) #KCa current
+    iPHOTO = @. -iDARK * J∞(G, kg)* (1.0 - exp((V - 8.5) / 17.0))
+    iLEAK = @. gLEAK*(V - -eLEAK) #Leak
+    iH =    @. gH*(O1 + O2 + O3)*(V - -eH) #Ih Current
+    iKV =   @. gKV*mKV^3+hKV*(V - -eK)
+    iCa =   @. gCa*mCa^4*hCa(V)*(V - -eCa*log(_Ca_s/_Ca_0)) #Ca current #We should add the log 
+    iKCa =  @. gKCa * mKCa^2 * mKCas(_Ca_s) * (V - -eK) #KCa current
     iCl =   @. gCl * mCl(_Ca_s) * (V + eCl) #Cl current
-    iEX =   @. J_ex * exp(-(V - 14) / 70) * (_Ca_s - Cae) / (_Ca_s - Cae + K_ex)
-    iEX2 =  @. J_ex2 * (_Ca_s - Cae) / (_Ca_s - Cae + K_ex2)
-    @. dV = -(iPHOTO + iLEAK + iH + iCa + iCl + iKCa + iKV + iEX + iEX2)/C_m #-iEX - iEX2 #This is the voltage equation, but we are not using it in this model
+    iEX =   @. J_ex * exp(-(V + 14) / 70) * (_Ca_s - Cae) / ((_Ca_s - Cae) + K_ex)
+    iEX2 =  @. J_ex2 * (_Ca_s - Cae) / ((_Ca_s - Cae) + K_ex2)
+    
+    #Voltage equation
+    @. dV = -(iPHOTO + iLEAK + iH + iCa + iCl + iKCa + iKV + iEX + iEX2)/C_m
 
+    #phototransduction equations
     @. dR = aC*Φ - kR1*R
     @. dT = kF2*R*(1-T) - kR2*T
     @. dP = kF3*T*(1-P) - kR3*P
     @. dG = -kHYDRO*P*G + kREC*(G0 - G) # Non-linear degradation
     
-    #println(H)
+    #Hyperpolarization-activated current (Ih) equations
     rH = hT.(V) * H
     @. dHC1 = rH[1]
     @. dHC2 = rH[2]
@@ -93,29 +97,22 @@ function phototransduction_ode!(du, u, p, t; stim_start = 0.0, stim_end = 1.0, p
     @. dHO2 = rH[4]
     @. dHO3 = rH[5]
 
+    #Channel gating equations
     @. dmKV = αmKV(V) * (1 - mKV) - βmKV(V) * mKV
     @. dhKV = αhKV(V) * (1 - hKV) - βhKV(V) * hKV
     @. dmCa = αmCa(V) * (1 - mCa) - βmCa(V) * mCa
     @. dmKCa = αmKCa(V) * (1 - mKCa) - βmKCa(V) * mKCa
 
-    #Make the calcium buffering system
-    if t % 10 == 0
-        println("t = $t")
-        println("Stim = $Φ")
-        println(iEX)
-        #println(-)
-        println(-((iCa + iEX + iEX2) / (2 * F * V1)) * 1e-6)
-    end
-    Ca_flux_elec = -iCa / (2F*V1) * 1e-6      # µM s⁻¹  (electrogenic)
-    Ca_flux_pump = (iEX + iEX2)/-iCa / (2F*V1) * 1e-6   # export µM s⁻¹
-    # @. d_Ca_s =(-((iCa + iEX + iEX2) / (2 * F * V1)) * 1e-6 - DCa * (S1 / (DELTA * V1)) * (_Ca_s - _Ca_f) - Lb1 * _Ca_s * (Bl - _CaB_ls) + Lb2 * _CaB_ls - Hb1 * _Ca_s * (Bh - _CaB_hs) + Hb2 * _CaB_hs)
-
-    # @. d_Ca_f =(  DCa * (S1 / (DELTA * V2)) * (_Ca_s - _Ca_f) - Lb1 * _Ca_f * (Bl - _CaB_lf) + Lb2 * _CaB_lf - Hb1 * _Ca_f * (Bh - _CaB_hf) + Hb2 * _CaB_hf)
-
-    # @. d_CaB_ls = Lb1 * _Ca_s * (Bl - _CaB_ls) - Lb2 * _CaB_ls
-    # @. d_CaB_hs = Hb1 * _Ca_s * (Bh - _CaB_hs) - Hb2 * _CaB_hs
-    # @. d_CaB_lf = Lb1 * _Ca_f * (Bl - _CaB_lf) - Lb2 * _CaB_lf
-    # @. d_CaB_hf = Hb1 * _Ca_f * (Bh - _CaB_hf) - Hb2 * _CaB_hf
+    #Calcium dynamics
+    Ca_flux_elec = iCa / (2F*V1) * 1e-6      # µM s⁻¹  (electrogenic)
+    Ca_flux_pump = (iEX + iEX2) / (2F*V1) * 1e-6   # export µM s⁻¹
+    
+    @. d_Ca_s =(-(Ca_flux_elec + Ca_flux_pump) - DCa * (S1 / (DELTA * V1)) * (_Ca_s - _Ca_f) - Lb1 * _Ca_s * (Bl - _CaB_ls) + Lb2 * _CaB_ls - Hb1 * _Ca_s * (Bh - _CaB_hs) + Hb2 * _CaB_hs)
+    @. d_Ca_f =(  DCa * (S1 / (DELTA * V2)) * (_Ca_s - _Ca_f) - Lb1 * _Ca_f * (Bl - _CaB_lf) + Lb2 * _CaB_lf - Hb1 * _Ca_f * (Bh - _CaB_hf) + Hb2 * _CaB_hf)
+    @. d_CaB_ls = Lb1 * _Ca_s * (Bl - _CaB_ls) - Lb2 * _CaB_ls
+    @. d_CaB_hs = Hb1 * _Ca_s * (Bh - _CaB_hs) - Hb2 * _CaB_hs
+    @. d_CaB_lf = Lb1 * _Ca_f * (Bl - _CaB_lf) - Lb2 * _CaB_lf
+    @. d_CaB_hf = Hb1 * _Ca_f * (Bh - _CaB_hf) - Hb2 * _CaB_hf
     
     #R_m = 10
     #@. dA = -((J+V0)/R_m + H + gREST*(A-0.0))/C_m 
