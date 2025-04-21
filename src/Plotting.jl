@@ -1,6 +1,25 @@
 #Model imports
 import DigitalTwin: hCa, mCl, mKCas, J∞, C∞
 
+#Define a convienance function
+function opts(i; rng = :log10) 
+    if rng == :log10
+        return (
+            color = round(log10(stim_range[i])), 
+            colormap = :viridis, 
+            colorrange = (log10(stim_range[1]), log10(stim_range[end]))
+        )
+    else
+        return (
+            color = round(stim_range[i]), 
+            colormap = :viridis, 
+            colorrange = (stim_range[1], stim_range[end])
+        )
+    end
+    return nothing  
+end
+        
+rng = :log10
 #Plotting Figure 1 phototransduction
 fig1 = Figure(size = (1200, 600), title = "Phototransduction model")
 ax1a = Axis(fig1[1, 1], title = "Rho"); hidespines!(ax1a)
@@ -16,36 +35,23 @@ for (i, sol) in enumerate(data_series)
     T_t = map(t -> sol(t)[3], t_rng)
     P_t = map(t -> sol(t)[4], t_rng)
     G_t = map(t -> sol(t)[5], t_rng)
+
     iPHOTO = @. -iDARK * J∞(G_t, kg) * (1.0 - exp((V_t - 8.5) / 17.0))
 
     vlines!(ax1a, [stim_start, stim_end], (-0.5, 1.0), color = :black, alpha = 0.2)
-    lines!(ax1a, t_rng, R_t,         
-        color = round(log10(photon_range[i])), colormap = :viridis, 
-        colorrange = (0.0, 3.0),
-        label = "Tr")
+    lines!(ax1a, t_rng, R_t; opts(i, rng = rng)...)
 
     vlines!(ax1b, [stim_start, stim_end], (-0.5, 1.0), color = :black, alpha = 0.2)
-    lines!(ax1b, t_rng, T_t,         
-        color = round(log10(photon_range[i])), colormap = :viridis, 
-        colorrange = (0.0, 3.0),
-        label = "Tr")
+    lines!(ax1b, t_rng, T_t; opts(i, rng = rng)...)
 
     vlines!(ax2a, [stim_start, stim_end], (-0.5, 1.0), color = :black, alpha = 0.2)
-    lines!(ax2a, t_rng, P_t,         
-        color = round(log10(photon_range[i])), colormap = :viridis, 
-        colorrange = (0.0, 3.0),
-        label = "Tr")
+    lines!(ax2a, t_rng, P_t; opts(i, rng = rng)...)
 
     vlines!(ax2b, [stim_start, stim_end], (-0.5, 1.0), color = :black, alpha = 0.2)
-    lines!(ax2b, t_rng, G_t,         
-        color = round(log10(photon_range[i])), colormap = :viridis, 
-        colorrange = (0.0, 3.0),
-        label = "Tr")
+    lines!(ax2b, t_rng, G_t; opts(i, rng = rng)...)
 
     vlines!(ax3, [stim_start, stim_end], (-0.5, 1.0), color = :black, alpha = 0.2)
-    lines!(ax3, t_rng, iPHOTO,         
-        color = round(log10(photon_range[i])), colormap = :viridis, 
-        colorrange = (0.0, 3.0), label = "A-wave")
+    lines!(ax3, t_rng, iPHOTO; opts(i, rng = rng)...)
 end
 fig1
 
@@ -99,55 +105,38 @@ for (i, sol) in enumerate(data_series)
     iCl =   @. gCl * mCl(_Ca_s) * (V - E_Cl) #Cl current
     iEX =   @. J_ex * C∞(_Ca_s, Cae, K_ex) * exp(-(V + 14) / 70)
     iEX2 =  @. J_ex2 * C∞(_Ca_s, Cae, K_ex2)
-    Ca_flux = (iCa + iEX + iEX2) / (2F*V1) * 1e-6   # export µM s⁻¹
+    Ca_flux = -(iCa + iEX + iEX2) / (2F*V1) * 1e-6   # export µM s⁻¹
 
-    lines!(ax2a, t_rng, iPHOTO,     
-        color = round(log10(photon_range[i])), colormap = :viridis, 
-        colorrange = (0.0, 3.0))
+    vlines!(ax2a, [stim_start, stim_end], (-0.5, 1.0), color = :black, alpha = 0.2)
+    lines!(ax2a, t_rng, iPHOTO; opts(i, rng = rng)...)
+        
+    vlines!(ax2b, [stim_start, stim_end], (-0.5, 1.0), color = :black, alpha = 0.2)
+    lines!(ax2b, t_rng, iLEAK; opts(i, rng = rng)...)
+    
+    vlines!(ax2c, [stim_start, stim_end], (-0.5, 1.0), color = :black, alpha = 0.2)
+    lines!(ax2c, t_rng, iH; opts(i, rng = rng)...)
 
-    lines!(ax2b, t_rng, iLEAK,     
-        color = round(log10(photon_range[i])), colormap = :viridis, 
-        colorrange = (0.0, 3.0))
+    vlines!(ax2d, [stim_start, stim_end], (-0.5, 1.0), color = :black, alpha = 0.2)
+    lines!(ax2d, t_rng, iKV; opts(i, rng = rng)...)
 
-    lines!(ax2c, t_rng, iH,     
-        color = round(log10(photon_range[i])), colormap = :viridis, 
-        colorrange = (0.0, 3.0))
+    vlines!(ax3a, [stim_start, stim_end], (-0.5, 1.0), color = :black, alpha = 0.2)
+    lines!(ax3a, t_rng, iCa; opts(i, rng = rng)...)
 
-    lines!(ax2d, t_rng, iKV,     
-        color = round(log10(photon_range[i])), colormap = :viridis, 
-        colorrange = (0.0, 3.0))
+    vlines!(ax3b, [stim_start, stim_end], (-0.5, 1.0), color = :black, alpha = 0.2)
+    lines!(ax3b, t_rng, iKCa; opts(i, rng = rng)...)
 
-    lines!(ax3a, t_rng, iCa,     
-        color = round(log10(photon_range[i])), colormap = :viridis, 
-        colorrange = (0.0, 3.0))
+    lines!(ax3c, t_rng, iCl; opts(i, rng = rng)...)
 
-    lines!(ax3b, t_rng, iKCa,     
-        color = round(log10(photon_range[i])), colormap = :viridis, 
-        colorrange = (0.0, 3.0))
+    lines!(ax4a, t_rng, iEX; opts(i, rng = rng)...)
 
-    lines!(ax3c, t_rng, iCl,     
-        color = round(log10(photon_range[i])), colormap = :viridis, 
-        colorrange = (0.0, 3.0))
+    lines!(ax4b, t_rng, iEX2; opts(i, rng = rng)...)
 
-    lines!(ax4a, t_rng, iEX,     
-        color = round(log10(photon_range[i])), colormap = :viridis, 
-        colorrange = (0.0, 3.0))
+    lines!(ax4c, t_rng, Ca_flux; opts(i, rng = rng)...)
 
-    lines!(ax4b, t_rng, iEX2,     
-        color = round(log10(photon_range[i])), colormap = :viridis, 
-        colorrange = (0.0, 3.0))
+    lines!(ax4d, t_rng, _Ca_s; opts(i, rng = rng)...)
 
-    lines!(ax4c, t_rng, Ca_flux,     
-        color = round(log10(photon_range[i])), colormap = :viridis, 
-        colorrange = (0.0, 3.0))
-
-    lines!(ax4d, t_rng, _Ca_s,     
-        color = round(log10(photon_range[i])), colormap = :viridis, 
-        colorrange = (0.0, 3.0))
-
-    lines!(ax1, t_rng, V_t,     
-        color = round(log10(photon_range[i])), colormap = :viridis, 
-        colorrange = (0.0, 3.0))
+    # vlines!(ax1, [stim_start, stim_end], (-0.5, 1.0), color = :black, alpha = 0.2)
+    lines!(ax1, t_rng, V_t; opts(i, rng = rng)...)
 end
 fig2
 
@@ -171,29 +160,15 @@ for (i, sol) in enumerate(data_series)
     CaB_lf_t = map(t -> sol(t)[19], t_rng)
     CaB_hf_t = map(t -> sol(t)[20], t_rng)
 
-    lines!(ax1, t_rng, CaS_t,     
-        color = round(log10(photon_range[i])), colormap = :viridis, 
-        colorrange = (0.0, 3.0))
-    lines!(ax2, t_rng, CaF_t,     
-        color = round(log10(photon_range[i])), colormap = :viridis, 
-        colorrange = (0.0, 3.0))
+    lines!(ax1, t_rng, CaS_t; opts(i, rng = rng)...)
+    lines!(ax2, t_rng, CaF_t; opts(i, rng = rng)...)
 
-    lines!(ax1a, t_rng, CaF_t.+CaS_t,     
-        color = round(log10(photon_range[i])), colormap = :viridis, 
-        colorrange = (0.0, 3.0))
+    lines!(ax1a, t_rng, CaF_t.+CaS_t; opts(i, rng = rng)...)
 
-    lines!(ax3, t_rng, CaB_ls_t,     
-        color = round(log10(photon_range[i])), colormap = :viridis, 
-        colorrange = (0.0, 3.0))
-    lines!(ax4, t_rng, CaB_hs_t,     
-        color = round(log10(photon_range[i])), colormap = :viridis, 
-        colorrange = (0.0, 3.0))
-    lines!(ax5, t_rng, CaB_lf_t,     
-        color = round(log10(photon_range[i])), colormap = :viridis, 
-        colorrange = (0.0, 3.0))
-    lines!(ax6, t_rng, CaB_hf_t,     
-        color = round(log10(photon_range[i])), colormap = :viridis, 
-        colorrange = (0.0, 3.0))
+    lines!(ax3, t_rng, CaB_ls_t; opts(i, rng = rng)...)
+    lines!(ax4, t_rng, CaB_hs_t; opts(i, rng = rng)...)
+    lines!(ax5, t_rng, CaB_lf_t; opts(i, rng = rng)...)
+    lines!(ax6, t_rng, CaB_hf_t; opts(i, rng = rng)...)
 end
 fig3
 
