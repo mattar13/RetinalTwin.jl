@@ -1,58 +1,51 @@
-#The stimulus function determines how much light is present at a given time.
-Stim(t, stim_start, stim_end, photon_flux) = stim_start <= t <= stim_end ? photon_flux : 0.0
+# ------------------------------------------------------------------
+# 1.  Stimulus and phototransduction helpers
+# ------------------------------------------------------------------
+Stim(t, t_on, t_off, Φ) = (t_on <= t <= t_off ? Φ : 0.0)
 
-sigm(x, l, xh) = x > 0 ? (1/(1+exp(-l*(x-xh)))) : 0
+J∞(g, kg) = g^3 / (g^3 + kg^3)                      # CNG gating
+C∞(C, Cae, K) = C > Cae ? (C - Cae)/(C - Cae + K) : 0.0   # clamp at 0
 
-H_inf(v, l, h) = v != 0 ? 1/(1+exp((v+l)/h)) : 0
-#H_inf(v, l, h) = 1/(1+exp((v+l)/h))
+# ------------------------------------------------------------------
+# 2.  Voltage‑gated K+ (IKv)
+# ------------------------------------------------------------------
+αmKV(v) =  5*(100 - v) / ( exp((100 - v)/42) - 1 )
+βmKV(v) =  9 * exp(-(v - 20)/40)
 
-B_inf(v, l, h) = v > 0 ? 1/(1+exp((v+l)/h)) : 0
+αhKV(v) = 0.15 * exp(-v/22)
+βhKV(v) = 0.4125 / ( exp((10 - v)/7) + 1 )
 
-J∞(g, kg) = (g^3)/(g^3 + kg^3) #CNG currents
+# ------------------------------------------------------------------
+# 3.  L‑type Ca2+ current (ICa)
+# ------------------------------------------------------------------
+αmCa(v) =  3*(80 - v) / ( exp((80 - v)/25) - 1 )
+βmCa(v) = 10 / ( 1 + exp((v + 38)/7) )
 
-# #Below is a work in progress for a more complicated photoreceptor model
-# kC = 0.1 #CNG channel opening rate
-# gL = 0.35 #Leakage conductance
-# EL =  #Leakage potential
+hCa(v)  = exp((40 - v)/18) / ( 1 + exp((40 - v)/18) )
 
-# A(Ca, A_max, kC) = A_max/(1.0 + (Ca/kC)^4)
-@. I_PHOTO(iDARK, G, kg) = -iDARK * J∞(G, kg)
-@. I_LEAK(v, gL, EL) = gL * (v - EL) #Leakage current
-I_KV(v, gKV, mKV, hKV, EK) = gKV * mKV^3 * hKV * (v - EK)
-I_Ca(v, gCa, mCa, ECa) = gCa * mCa^4 * hCa(v) * (v - ECa)
-I_Cl(v, gCl, _Ca_s, ECl) = gCl * mCl(_Ca_s) * (v - ECl)
-I_KCa(v, gKCa, mKCa, _Ca_s, EK) = gKCa * mKCa^2 * mKCas(_Ca_s) * (v - EK)
-I_ex(v, J_ex, _Ca_s, Cae, K_ex) = J_ex * exp(-(v - 14) / 70) * (_Ca_s - Cae) / (_Ca_s - Cae + K_ex)
-I_ex2(J_ex2, _Ca_s, Cae, K_ex2) = J_ex2 * (_Ca_s - Cae) / (_Ca_s - Cae + K_ex2)
-I_h(v, gH, O1, O2, O3, EH) = gH * (O1 + O2 + O3) * (v - EH)
+# ------------------------------------------------------------------
+# 4.  Ca2+‑activated K+ current (IK(Ca))
+# ------------------------------------------------------------------
+αmKCa(v) = 15*(80 - v) / ( exp((80 - v)/40) - 1 )
+βmKCa(v) = 20 * exp(-v/35)
 
-#Kv equations
-αmKV(v) = (5 * (100 - v)) / (exp((100 - v) / 42) - 1)
-βmKV(v) = 9 * exp(-(v - 20) / 40)
-αhKV(v) = 0.15 * exp(-v / 22)
-βhKV(v) = 0.4125 / (exp((10 - v) / 7) + 1)
+mKCas(C) = C / (C + 0.3)                             # BK Ca‑gate
 
-#Calcium equations
-αmCa(v) = (3 * (80 - v)) / (exp((80 - v) / 25) - 1)
-βmCa(v) = 10 / (1 + exp((v + 38) / 7))
-hCa(v) = exp((40 - v) / 18) / (1 + exp((40 - v) / 18))
+# ------------------------------------------------------------------
+# 5.  Ca2+‑activated Cl− current (ICl(Ca))
+# ------------------------------------------------------------------
+mCl(C)  = 1 / ( 1 + exp((0.37 - C)/0.09) )           # note 0.09 !
 
-αmKCa(v) = (15 * (80 - v)) / (exp((80 - v) / 40) - 1)
-βmKCa(v) = 20 * exp(-v / 35)
-mKCas(_Ca_s) = _Ca_s / (_Ca_s + 0.3)
+# ------------------------------------------------------------------
+# 6.  Hyperpolarisation‑activated current (Ih) – 5‑state matrix
+# ------------------------------------------------------------------
+αh(v) =  8  / ( exp((v + 78)/14) + 1 )
+βh(v) = 18 / ( exp(-(v + 8)/19) + 1 )                # minus‑sign & 8
 
-#Calcium activated chloride
-mCl(_Ca_s) = 1 / (1 + exp((0.37 - _Ca_s) / 0.9))
-
-
-#Hyperpolarising current
-αh(v) = 8 / (exp((v + 78) / 14) + 1)
-βh(v) = 18 / (exp(-(v + 9) / 19) + 1)
-
-hT(v) = [
-     -4*αh(v) βh(v) 0.0 0.0 0.0
-     4*αh(v) -(3*αh(v) + βh(v)) 2*βh(v) 0.0 0.0
-     0.0 3*αh(v) -(2*αh(v)+2*βh(v)) 3*βh(v) 0.0
-     0.0 0.0 2*αh(v) -(αh(v) + 3*βh(v)) 4*βh(v)
-     0.0 0.0 0.0 αh(v) -4*βh(v)
+hT(v)  = [
+   -4αh(v)       βh(v)        0        0        0
+    4αh(v)  -(3αh(v)+βh(v))  2βh(v)    0        0
+      0        3αh(v)  -(2αh(v)+2βh(v)) 3βh(v)   0
+      0          0        2αh(v)  -(αh(v)+3βh(v)) 4βh(v)
+      0          0          0        αh(v)    -4βh(v)
 ]
