@@ -1,77 +1,57 @@
 using Revise
 using DigitalTwin
-import DigitalTwin: SteadyStateProblem
-import DigitalTwin: J
 using GLMakie, PhysiologyPlotting
-
+import DigitalTwin: Rodas5, SSRootfind, DynamicSS
+import DigitalTwin.phototransduction_ode!
 using DataFrames, CSV
 
-#%% make the model
-param_df = CSV.read(raw"E:\KozLearn\Standards\phototrans_params.csv", DataFrame)
+# make the model
+param_df = CSV.read(raw"Parameters\starting_params.csv", DataFrame)
 keys = param_df.Key
 p0 = param_df.Value
 opt_params = deepcopy(p0) # This is the parameter set that will be optimizes
 lower_bounds = param_df.LowerBounds
 upper_bounds = param_df.UpperBounds
-photon_range = [0.4, 4.0, 40.0, 400.0, 4000.0]
+#stim_range = collect(-65:5:-20) #V hold
+stim_range = [1.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0]
+
+cond_df = CSV.read(raw"Parameters\starting_conditions.csv", DataFrame)
+u0 = cond_df.value
+
+(aC, kR1, kF1, kR2, kR3, kHYDRO, kREC, G0, iDARK, kg, 
+C_m, gLEAK, eLEAK, gH, eH, gKV, eK, gCa, eCa, _Ca_0, gKCa, gCl, eCl, 
+F, DCa, S1, DELTA, V1, V2, Lb1, Bl, Lb2, Hb1, Bh, Hb2,
+J_ex, Cae, K_ex, J_ex2, K_ex2,
+) = p0
+
+#Solve a steady state? 
+ss_prob = SteadyStateProblem(phototransduction_ode!, u0, p0)
+ss_sol  = solve(ss_prob, DynamicSS(Rodas5()))
+u0 = ss_sol.u
 
 data_series = []
-stim_start = 10.0
-stim_end = 11.0
-for i in photon_range
+stim_start = 0.100
+stim_end = 0.120
+# stim_start = stim_end = 0.0
+tspan = (0.0, 10.0)
+t_rng = LinRange(0.0, tspan[end], 1000)
+for i in stim_range
     println("Simulating for $i")
     photons = i
 
-    u = zeros(4)
-    tspan = (0.0, 5000.0)
-    time = LinRange(tspan[1], tspan[2], 1000)
-    model!(du, u, p, t) = DigitalTwin.phototransduction_model!(du, u, p, t; stim_start = stim_start, stim_end = stim_end, photon_flux = photons)
-    prob = ODEProblem(model!, u, tspan, p0)
-    sol = solve(prob, Tsit5(), tstops=[stim_start, stim_end])
-    push!(data_series, sol)
+    model!(du, u, p, t) = DigitalTwin.phototransduction_ode!(du, u, p, t; stim_start = stim_start, stim_end = stim_end, photon_flux = photons)
+    prob = ODEProblem(model!, u0, tspan, p0[1:40])
+    try
+        sol = solve(prob, Rodas5(), dt = 0.001, tstops=[stim_start, stim_end])
+        push!(data_series, sol)
+    catch error
+        println("Error during simulation: $error")
+        println("Simulation failed for photon flux: $i")
+        continue
+    end
 end
-#%%
-time = LinRange(tspan[1], tspan[2], 1000)
-model!(du, u, p, t) = DigitalTwin.phototransduction_model!(du, u, p, t; stim_start = stim_start, stim_end = stim_end, photon_flux = photons)
-prob = ODEProblem(model!, u, tspan, p0)
-sol = solve(prob, Tsit5(), tstops=[stim_start, stim_end])
 
-#%%
-push!(data_series, sol)
-fig = Figure(size = (1200, 600))
-ax1 = Axis(fig[1, 1], title = "Phototransduction"); hidespines!(ax1)
-ax2a = Axis(fig[2, 1], title = "Calcium dynamics"); hidespines!(ax2a)
-ax2b = Axis(fig[2, 2], title = "cGMP"); hidespines!(ax2b)
-ax3 = Axis(fig[3, 1], title = "Voltage"); hidespines!(ax3)
+include("Plotting.jl")
 
-for (i, sol) in enumerate(data_series)
-    Rh_t = map(t -> sol(t)[1], time)
-    Tr_t = map(t -> sol(t)[2], time)
-    PDE_t = map(t -> sol(t)[3], time)
-    C_t = map(t -> sol(t)[4], time)
-
-    # lines!(ax1, time, Rh_t,             
-    #     color = round(log10(photon_range[i])), colormap = :viridis, 
-    #     colorrange = (0.0, 3.0),
-    #     label = "Rho"
-    # )
-    lines!(ax1, time, Tr_t,         
-        color = round(log10(photon_range[i])), colormap = :viridis, 
-        colorrange = (0.0, 3.0),
-        label = "Tr")
-    # lines!(ax1, time, PDE_t, color = :green, label = "PDE")
-
-    # lines!(ax2a, time, Ca_t,         
-    #     color = round(log10(photon_range[i])), colormap = :viridis, 
-    #     colorrange = (0.0, 3.0), label = "Ca")
-    # #lines!(ax2a, time, CaB_t, color = :purple, label = "CaB")
-
-    # lines!(ax2b, time, cGMP_t,         
-    #     color = round(log10(photon_range[i])), colormap = :viridis, 
-    #     colorrange = (0.0, 3.0),label = "cGMP")
-
-    # lines!(ax3, time, v_t,         
-    #     color = round(log10(photon_range[i])), colormap = :viridis, 
-    #     colorrange = (0.0, 3.0), label = "V")
-end
-fig
+fig3
+fig2
