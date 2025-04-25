@@ -211,9 +211,6 @@ function phototransduction_compartments!(du, u, p, t; stim_start = 0.0, stim_end
     iEX =   @. J_ex * C∞(_Ca_s, Cae, K_ex) * exp(-(V + 14) / 70)
     iEX2 =  @. J_ex2 * C∞(_Ca_s, Cae, K_ex2)
 
-    iOSIS = iLEAK
-    iIS = iISCB = iCB = iAX = iST = iCa + iCl + iEX + iEX2 + iKCa + iH + iKV
-
     #Voltage equation
     iPHOTO = @. -iDARK * J∞(G, 10.0) * (1.0 - exp((V_os - 8.5) / 17.0))
     @. dV_os = -(iPHOTO)/Cm_os

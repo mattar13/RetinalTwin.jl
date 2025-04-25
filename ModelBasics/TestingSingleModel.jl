@@ -51,7 +51,7 @@ for i in stim_range
     end
 end
 
-include("Plotting.jl")
+include("PlottingSingleModel.jl")
 
 fig3
 fig2
