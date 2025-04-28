@@ -150,33 +150,37 @@ function phototransduction_compartments!(du, u, p, t; stim_start = 0.0, stim_end
     mKCa = view(u, 13)
     _Ca_s = view(u, 14)
     
-    V_os    = view(u, 20)
-    V_osis  = view(u, 21)
-    V_is    = view(u, 22)
-    V_iscb  = view(u, 23)
-    V_ax    = view(u, 24)
-    V_st    = view(u, 25)
-    
     dV_os    = view(du, 20)
     dV_osis  = view(du, 21)
     dV_is    = view(du, 22)
     dV_iscb  = view(du, 23)
-    dV_ax    = view(du, 24)
-    dV_st    = view(du, 25)
+    dV_cb    = view(du, 24)
+    dV_ax    = view(du, 25)
+    dV_st    = view(du, 26)
 
-    du_os = view(du, 26)
-    du_osis = view(du, 27)
-    du_is = view(du, 28)
-    du_iscb = view(du, 29)
-    du_ax = view(du, 30)
-    du_st = view(du, 31)
+    V_os    = view(u, 20)
+    V_osis  = view(u, 21)
+    V_is    = view(u, 22)
+    V_iscb  = view(u, 23)
+    V_cb    = view(u, 24)
+    V_ax    = view(u, 25)
+    V_st    = view(u, 26)
+    
+    du_os   = view(du, 27)
+    du_osis = view(du, 28)
+    du_is   = view(du, 29)
+    du_iscb = view(du, 30)
+    du_cb   = view(du, 31)
+    du_ax   = view(du, 32)
+    du_st   = view(du, 33)
 
-    u_os = view(u, 26)
-    u_osis = view(u, 27)
-    u_is = view(u, 28)
-    u_iscb = view(u, 29)
-    u_ax = view(u, 30)
-    u_st = view(u, 31)
+    u_os   = view(u, 27)
+    u_osis = view(u, 28)
+    u_is   = view(u, 29)
+    u_iscb = view(u, 30)
+    u_cb   = view(u, 31)
+    u_ax   = view(u, 32)
+    u_st   = view(u, 33)
 
     #Open parameters
     (aC, kR1, kF1, kR2, kR3, kHYDRO, kREC, G0, iDARK, kg, 
@@ -191,6 +195,7 @@ function phototransduction_compartments!(du, u, p, t; stim_start = 0.0, stim_end
     Cm_osis = 0.236
     Cm_is = 43.21
     Cm_iscb = 6.43
+    Cm_cb = 23.86
     Cm_ax = 9.09
     Cm_st = 4.19
 
@@ -200,16 +205,6 @@ function phototransduction_compartments!(du, u, p, t; stim_start = 0.0, stim_end
     E_K   = -eK
     E_Cl  = -eCl
     E_Ca =  @. eCa * log(_Ca_0 / max(_Ca_s, 1e-5)) 
-
-    #Currents
-    iLEAK = @. gLEAK*(V - E_LEAK) #Leak
-    iH =    @. gH*(O1 + O2 + O3)*(V - E_H) #Ih Current
-    iKV =   @. gKV*mKV^3*hKV*(V - E_K)
-    iCa =   @. gCa*mCa^4*hCa(V)*(V - E_Ca) #Ca current #We should add the log 
-    iKCa =  @. gKCa * mKCa^2 * mKCas(_Ca_s) * (V - E_K) #KCa current
-    iCl =   @. gCl * mCl(_Ca_s) * (V - E_Cl) #Cl current
-    iEX =   @. J_ex * C∞(_Ca_s, Cae, K_ex) * exp(-(V + 14) / 70)
-    iEX2 =  @. J_ex2 * C∞(_Ca_s, Cae, K_ex2)
 
     #Voltage equation
     iPHOTO = @. -iDARK * J∞(G, 10.0) * (1.0 - exp((V_os - 8.5) / 17.0))
@@ -242,7 +237,7 @@ function phototransduction_compartments!(du, u, p, t; stim_start = 0.0, stim_end
     iH =    @. gH*(O1 + O2 + O3)*(V_cb - E_H) #Ih Current
     iKV =   @. gKV*mKV^3*hKV*(V_cb - E_K)
     iCa =   @. gCa*mCa^4*hCa(V_cb)*(V_cb - E_Ca) #Ca current #We should add the log 
-    iKCa =  @. gKCa * mKCa^2 * mKCas(_Ca_s) * (cb - E_K) #KCa current
+    iKCa =  @. gKCa * mKCa^2 * mKCas(_Ca_s) * (V_cb - E_K) #KCa current
     iCl =   @. gCl * mCl(_Ca_s) * (V_cb - E_Cl) #Cl current
     iEX =   @. J_ex * C∞(_Ca_s, Cae, K_ex) * exp(-(V_cb + 14) / 70)
     iEX2 =  @. J_ex2 * C∞(_Ca_s, Cae, K_ex2)
@@ -252,7 +247,7 @@ function phototransduction_compartments!(du, u, p, t; stim_start = 0.0, stim_end
     iH =    @. gH*(O1 + O2 + O3)*(V_ax - E_H) #Ih Current
     iKV =   @. gKV*mKV^3*hKV*(V_ax - E_K)
     iCa =   @. gCa*mCa^4*hCa(V_ax)*(V_ax - E_Ca) #Ca current #We should add the log 
-    iKCa =  @. gKCa * mKCa^2 * mKCas(_Ca_s) * (cb - E_K) #KCa current
+    iKCa =  @. gKCa * mKCa^2 * mKCas(_Ca_s) * (V_ax - E_K) #KCa current
     iCl =   @. gCl * mCl(_Ca_s) * (V_ax - E_Cl) #Cl current
     iEX =   @. J_ex * C∞(_Ca_s, Cae, K_ex) * exp(-(V_ax + 14) / 70)
     iEX2 =  @. J_ex2 * C∞(_Ca_s, Cae, K_ex2)
@@ -262,7 +257,7 @@ function phototransduction_compartments!(du, u, p, t; stim_start = 0.0, stim_end
     iH =    @. gH*(O1 + O2 + O3)*(V_st - E_H) #Ih Current
     iKV =   @. gKV*mKV^3*hKV*(V_st - E_K)
     iCa =   @. gCa*mCa^4*hCa(V_st)*(V_st - E_Ca) #Ca current #We should add the log 
-    iKCa =  @. gKCa * mKCa^2 * mKCas(_Ca_s) * (cb - E_K) #KCa current
+    iKCa =  @. gKCa * mKCa^2 * mKCas(_Ca_s) * (V_st - E_K) #KCa current
     iCl =   @. gCl * mCl(_Ca_s) * (V_st - E_Cl) #Cl current
     iEX =   @. J_ex * C∞(_Ca_s, Cae, K_ex) * exp(-(V_st + 14) / 70)
     iEX2 =  @. J_ex2 * C∞(_Ca_s, Cae, K_ex2)
