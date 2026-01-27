@@ -12,7 +12,7 @@ using Pkg
 Pkg.activate(".")
 
 # Load the package
-include("src/VisualPathwayTwin.jl")
+include("../src/VisualPathwayTwin.jl")
 using .VisualPathwayTwin
 
 using Random
