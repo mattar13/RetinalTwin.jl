@@ -2,11 +2,7 @@
 
 julia_version = "1.11.1"
 manifest_format = "2.0"
-<<<<<<< HEAD
-project_hash = "fae897f5a3998590fc323af6e50c6d6ea3e7e577"
-=======
 project_hash = "9812dddcaede56c65ce18f783467f4b578a108b7"
->>>>>>> bf3f006e7237173de4ed5223e6b84fe6b61f2ae8
 
 [[deps.ADTypes]]
 git-tree-sha1 = "f7304359109c768cf32dc5fa2d371565bb63b68a"
@@ -1550,14 +1546,11 @@ weakdeps = ["SparseArrays"]
     [deps.MaybeInplace.extensions]
     MaybeInplaceSparseArraysExt = "SparseArrays"
 
-<<<<<<< HEAD
-=======
 [[deps.MbedTLS_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "c8ffd9c3-330d-5841-b78e-0817d7145fa1"
 version = "2.28.6+0"
 
->>>>>>> bf3f006e7237173de4ed5223e6b84fe6b61f2ae8
 [[deps.MeshIO]]
 deps = ["ColorTypes", "FileIO", "GeometryBasics", "Printf"]
 git-tree-sha1 = "c009236e222df68e554c7ce5c720e4a33cc0c23f"
