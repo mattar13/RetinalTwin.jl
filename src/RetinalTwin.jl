@@ -42,6 +42,7 @@ include("simulation/run.jl")
 
 # --- Visualization ---
 include("visualization/plots.jl")
+include("visualization/gl_plots.jl")
 
 # --- Validation ---
 include("validation/targets.jl")
@@ -69,6 +70,7 @@ export
     compute_erg, extract_ops,
     # Visualization
     plot_erg, plot_cell_voltages, plot_ops, plot_intensity_response,
+    plot_erg_gl, plot_cell_voltages_gl, plot_phototransduction_breakdown,
     # Validation
     compute_validation_metrics,
     # Utilities

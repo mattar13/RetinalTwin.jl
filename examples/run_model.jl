@@ -166,15 +166,20 @@ else
     result = (t=sol.t, erg=erg, erg_components=components,
               cell_voltages=voltages, solution=sol, col=col, sidx=sidx)
 
-    # ── 10. Plot (uncomment when ready) ──────────────────────────
+    # ── 10. Plot with GLMakie ────────────────────────────────────
+    show_plots = true
+    if show_plots
+        fig_erg = plot_erg_gl(result, show_components=true)
+        display(fig_erg)
 
-    # fig_erg = plot_erg(result, show_components=true)
-    # display(fig_erg)
-    #
-    # fig_v = plot_cell_voltages(result,
-    #     cell_types=[:rod, :cone, :on_bc, :off_bc, :a2, :gaba_ac, :gc])
-    # display(fig_v)
+        fig_v = plot_cell_voltages_gl(result,
+            cell_types=[:rod, :cone, :on_bc, :off_bc, :a2, :gaba_ac, :gc])
+        display(fig_v)
+
+        fig_photo = plot_phototransduction_breakdown(result, cell=:rod, cell_index=1)
+        display(fig_photo)
+    end
 
     println("\nDone. Result tuple available as `result`.")
-    println("Uncomment plotting section or call plot_erg(result) / plot_cell_voltages(result)")
+    println("GLMakie plots displayed: ERG, cell voltages, phototransduction breakdown")
 end
