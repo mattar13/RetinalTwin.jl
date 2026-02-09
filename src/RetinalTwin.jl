@@ -70,6 +70,7 @@ export
     # Simulation
     simulate_flash, extract_voltages, extract_neurotransmitters,
     dark_adapted_state, retinal_column_rhs!, zipper_rhs!,
+    rod_dark_state, rod_rhs!,
     rod_cell_rhs!, cone_cell_rhs!,
     horizontal_cell_rhs!, on_bipolar_cell_rhs!, off_bipolar_cell_rhs!,
     a2_cell_rhs!, gaba_cell_rhs!, da_cell_rhs!, ganglion_cell_rhs!,

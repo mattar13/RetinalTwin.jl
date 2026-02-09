@@ -55,6 +55,48 @@ function rod_glutamate_release(V::Real, params::RodPhotoreceptorParams)
 end
 
 """
+    rod_dark_state(params::RodPhotoreceptorParams)
+
+Return dark-adapted initial conditions for a single rod.
+"""
+function rod_dark_state(params::RodPhotoreceptorParams)
+    u0 = zeros(ROD_STATE_VARS)
+    u0[ROD_V_INDEX] = -36.186
+    u0[ROD_MKV_INDEX] = 0.430
+    u0[ROD_HKV_INDEX] = 0.999
+    u0[ROD_MCA_INDEX] = 0.436
+    u0[ROD_MKCA_INDEX] = 0.642
+    u0[ROD_CA_S_INDEX] = 0.0966
+    u0[ROD_CA_F_INDEX] = 0.0966
+    u0[ROD_CAB_LS_INDEX] = 80.929
+    u0[ROD_CAB_HS_INDEX] = 29.068
+    u0[ROD_CAB_LF_INDEX] = 80.929
+    u0[ROD_CAB_HF_INDEX] = 29.068
+    u0[ROD_RH_INDEX] = 0.0
+    u0[ROD_RHI_INDEX] = 0.0
+    u0[ROD_TR_INDEX] = 0.0
+    u0[ROD_PDE_INDEX] = 0.0
+    u0[ROD_CA_PHOTO_INDEX] = 0.3
+    u0[ROD_CAB_PHOTO_INDEX] = 34.88
+    u0[ROD_CGMP_INDEX] = 2.0
+    u0[ROD_GLU_INDEX] = rod_glutamate_release(u0[ROD_V_INDEX], params)
+    return u0
+end
+
+"""
+    rod_rhs!(du, u, p, t)
+
+Standalone rod RHS.
+`p = (params::RodPhotoreceptorParams, stim::StimulusProtocol, I_feedback::Real)`.
+"""
+function rod_rhs!(du, u, p, t)
+    params, stim, I_feedback = p
+    Phi = compute_stimulus(stim, t)
+    update_rod_photoreceptor!(du, u, params, Phi, I_feedback)
+    return nothing
+end
+
+"""
     update_rod_photoreceptor!(du, u, params::RodPhotoreceptorParams, Phi, I_feedback)
 
 Biophysical rod model:
