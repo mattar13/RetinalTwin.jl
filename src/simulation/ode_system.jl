@@ -23,9 +23,9 @@ function retinal_column_rhs!(du, u, p, t)
     Phi = compute_stimulus(col.stimulus, t)
 
     # --- Phase 1: Read neurotransmitter concentrations ---
-    # Photoreceptor glutamate (var 6 in PR state)
-    glu_rod_mean  = mean_nt(u, sidx.rod, 6, 6, pop.n_rod)
-    glu_cone_mean = mean_nt(u, sidx.cone, 6, 6, pop.n_cone)
+    # Photoreceptor glutamate
+    glu_rod_mean  = mean_nt(u, sidx.rod, ROD_GLU_INDEX, ROD_STATE_VARS, pop.n_rod)
+    glu_cone_mean = mean_nt(u, sidx.cone, CONE_GLU_INDEX, CONE_STATE_VARS, pop.n_cone)
     glu_pr_mean   = weighted_mean(glu_rod_mean, pop.n_rod, glu_cone_mean, pop.n_cone)
 
     # ON-bipolar glutamate (var 4 in ON-BC state)
@@ -48,12 +48,12 @@ function retinal_column_rhs!(du, u, p, t)
     # --- Phase 2: Compute K+ currents for Müller/RPE ---
     total_I_K = 0.0
     for i in 1:pop.n_rod
-        offset = sidx.rod[1] + (i - 1) * 6
-        total_I_K += photoreceptor_K_current(view(u, offset:offset+5), col.rod_params)
+        offset = sidx.rod[1] + (i - 1) * ROD_STATE_VARS
+        total_I_K += photoreceptor_K_current(view(u, offset:offset + ROD_STATE_VARS - 1), col.rod_params)
     end
     for i in 1:pop.n_cone
-        offset = sidx.cone[1] + (i - 1) * 6
-        total_I_K += photoreceptor_K_current(view(u, offset:offset+5), col.cone_params)
+        offset = sidx.cone[1] + (i - 1) * CONE_STATE_VARS
+        total_I_K += photoreceptor_K_current(view(u, offset:offset + CONE_STATE_VARS - 1), col.cone_params)
     end
 
     # Total glutamate released (for Müller cell sensing)
@@ -65,17 +65,17 @@ function retinal_column_rhs!(du, u, p, t)
 
     # Photoreceptors (rods)
     for i in 1:pop.n_rod
-        offset = sidx.rod[1] + (i - 1) * 6
-        update_photoreceptor!(view(du, offset:offset+5),
-                              view(u, offset:offset+5),
-                              col.rod_params, Phi, I_hc_fb)
+        offset = sidx.rod[1] + (i - 1) * ROD_STATE_VARS
+        update_rod_photoreceptor!(view(du, offset:offset + ROD_STATE_VARS - 1),
+                                  view(u, offset:offset + ROD_STATE_VARS - 1),
+                                  col.rod_params, Phi, I_hc_fb)
     end
 
     # Photoreceptors (cones)
     for i in 1:pop.n_cone
-        offset = sidx.cone[1] + (i - 1) * 6
-        update_photoreceptor!(view(du, offset:offset+5),
-                              view(u, offset:offset+5),
+        offset = sidx.cone[1] + (i - 1) * CONE_STATE_VARS
+        update_photoreceptor!(view(du, offset:offset + CONE_STATE_VARS - 1),
+                              view(u, offset:offset + CONE_STATE_VARS - 1),
                               col.cone_params, Phi, I_hc_fb)
     end
 

@@ -42,12 +42,12 @@ function compute_erg(sol, col::RetinalColumn, sidx::StateIndex)
         # --- Photoreceptors (a-wave) ---
         I_rod = 0.0
         for i in 1:p.n_rod
-            offset = sidx.rod[1] + (i - 1) * 6 + 3  # V is var 4 (0-indexed: +3)
+            offset = sidx.rod[1] + (i - 1) * ROD_STATE_VARS + (ROD_V_INDEX - 1)
             I_rod += col.rod_params.C_m * (u[offset] - u_prev[offset]) / dt
         end
         I_cone = 0.0
         for i in 1:p.n_cone
-            offset = sidx.cone[1] + (i - 1) * 6 + 3
+            offset = sidx.cone[1] + (i - 1) * CONE_STATE_VARS + (CONE_V_INDEX - 1)
             I_cone += col.cone_params.C_m * (u[offset] - u_prev[offset]) / dt
         end
         pr_contrib = w.rod * I_rod + w.cone * I_cone

@@ -81,8 +81,8 @@ function extract_voltages(sol, col::RetinalColumn, sidx::StateIndex)
         voltages[name] = V
     end
 
-    extract_pop!(:rod,     sidx.rod,     6, 4, p.n_rod)    # V is var 4
-    extract_pop!(:cone,    sidx.cone,    6, 4, p.n_cone)
+    extract_pop!(:rod,     sidx.rod,     ROD_STATE_VARS, ROD_V_INDEX, p.n_rod)
+    extract_pop!(:cone,    sidx.cone,    CONE_STATE_VARS, CONE_V_INDEX, p.n_cone)
     extract_pop!(:hc,      sidx.hc,      3, 1, p.n_hc)     # V is var 1
     extract_pop!(:on_bc,   sidx.on_bc,   4, 1, p.n_on)
     extract_pop!(:off_bc,  sidx.off_bc,  4, 1, p.n_off)
@@ -123,8 +123,8 @@ function extract_neurotransmitters(sol, col::RetinalColumn, sidx::StateIndex)
         nts[name] = NT
     end
 
-    extract_nt!(:glu_rod,  sidx.rod,     6, 6, p.n_rod)    # Glu is var 6
-    extract_nt!(:glu_cone, sidx.cone,    6, 6, p.n_cone)
+    extract_nt!(:glu_rod,  sidx.rod,     ROD_STATE_VARS, ROD_GLU_INDEX, p.n_rod)
+    extract_nt!(:glu_cone, sidx.cone,    CONE_STATE_VARS, CONE_GLU_INDEX, p.n_cone)
     extract_nt!(:glu_on,   sidx.on_bc,   4, 4, p.n_on)     # Glu is var 4
     extract_nt!(:glu_off,  sidx.off_bc,  4, 4, p.n_off)
     extract_nt!(:gly_a2,   sidx.a2,      3, 3, p.n_a2)     # Gly is var 3

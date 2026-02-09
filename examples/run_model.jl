@@ -23,7 +23,7 @@ println("  GC: $(col.pop.n_gc)  |  Müller: $(col.pop.n_muller)  |  RPE: $(col.p
 
 # State vector layout (flat vector, 1-indexed ranges):
 println("\nState index ranges:")
-println("  rod:     $(sidx.rod)      (6 vars × $(col.pop.n_rod): R*, G, Ca, V, h, Glu)")
+println("  rod:     $(sidx.rod)      (19 vars × $(col.pop.n_rod): V, mKv, hKv, mCa, mKCa, Ca_s, Ca_f, Cab_ls, Cab_hs, Cab_lf, Cab_hf, Rh, Rhi, Tr, PDE, Ca_photo, Cab_photo, cGMP, Glu)")
 println("  cone:    $(sidx.cone)  (6 vars × $(col.pop.n_cone): R*, G, Ca, V, h, Glu)")
 println("  hc:      $(sidx.hc)  (3 vars × $(col.pop.n_hc): V, w, s_Glu)")
 println("  on_bc:   $(sidx.on_bc)  (4 vars × $(col.pop.n_on): V, w, S_mGluR6, Glu)")
@@ -68,7 +68,7 @@ println("\nInitial state vector: $(length(u0)) elements")
 
 # Spot-check a few values:
 rod1_offset = sidx.rod[1]
-println("  Rod 1: R*=$(u0[rod1_offset]), G=$(u0[rod1_offset+1]), Ca=$(u0[rod1_offset+2]), V=$(u0[rod1_offset+3]) mV, h=$(u0[rod1_offset+4]), Glu=$(u0[rod1_offset+5])")
+println("  Rod 1: V=$(u0[rod1_offset]) mV, mKv=$(u0[rod1_offset+1]), hKv=$(u0[rod1_offset+2]), Ca_s=$(u0[rod1_offset+5]) uM, cGMP=$(u0[rod1_offset+17]) uM, Glu=$(u0[rod1_offset+18])")
 
 on_offset = sidx.on_bc[1]
 println("  ON-BC: V=$(u0[on_offset]) mV, w=$(u0[on_offset+1]), S_mGluR6=$(u0[on_offset+2]), Glu=$(u0[on_offset+3])")
@@ -136,7 +136,7 @@ else
     for t_check in [0.0, 100.0, t_on, t_on + 5.0, t_on + 50.0, t_on + 200.0, 500.0]
         ti = argmin(abs.(sol.t .- t_check))
         u = sol.u[ti]
-        rod_V = u[rod1_offset + 3]
+        rod_V = u[rod1_offset + ROD_V_INDEX - 1]
         on_V  = u[on_offset]
         gc_V  = u[gc_offset]
         println("  t=$(round(sol.t[ti], digits=1)) ms:  Rod V=$(round(rod_V, digits=2)) mV,  ON-BC V=$(round(on_V, digits=2)) mV,  GC V=$(round(gc_V, digits=2)) mV")
@@ -168,12 +168,12 @@ else
 
     # ── 10. Plot (uncomment when ready) ──────────────────────────
 
-    # fig_erg = plot_erg(result, show_components=true)
-    # display(fig_erg)
-    #
-    # fig_v = plot_cell_voltages(result,
-    #     cell_types=[:rod, :cone, :on_bc, :off_bc, :a2, :gaba_ac, :gc])
-    # display(fig_v)
+    fig_erg = plot_erg(result, show_components=true)
+    display(fig_erg)
+    
+    fig_v = plot_cell_voltages(result,
+        cell_types=[:rod, :cone, :on_bc, :off_bc, :a2, :gaba_ac, :gc])
+    display(fig_v)
 
     println("\nDone. Result tuple available as `result`.")
     println("Uncomment plotting section or call plot_erg(result) / plot_cell_voltages(result)")

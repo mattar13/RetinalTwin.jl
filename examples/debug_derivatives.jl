@@ -20,13 +20,13 @@ println("=" ^ 60)
 
 # Rod 1
 idx = sidx.rod[1]
-println("\nRod 1 (indices $(idx):$(idx+5)):")
-println("  dR*/dt  = $(du[idx])")
-println("  dG/dt   = $(du[idx+1])")
-println("  dCa/dt  = $(du[idx+2])")
-println("  dV/dt   = $(du[idx+3])  [V = $(u0[idx+3]) mV]")
-println("  dh/dt   = $(du[idx+4])")
-println("  dGlu/dt = $(du[idx+5])")
+println("\nRod 1 (indices $(idx):$(idx+ROD_STATE_VARS-1)):")
+println("  dV/dt        = $(du[idx])  [V = $(u0[idx]) mV]")
+println("  dmKv/dt      = $(du[idx+1])")
+println("  dhKv/dt      = $(du[idx+2])")
+println("  dCa_s/dt     = $(du[idx+5])")
+println("  dcGMP/dt     = $(du[idx+17])")
+println("  dGlu/dt      = $(du[idx+18])")
 
 # ON-BC
 idx = sidx.on_bc[1]
@@ -84,9 +84,9 @@ println("\nTop 10 fastest-changing variables (by |du|):")
 for (rank, i) in enumerate(top_idx)
     # Figure out which cell type
     cell_type = if i in sidx.rod
-        "Rod $(div(i - sidx.rod[1], 6) + 1), var $(mod(i - sidx.rod[1], 6) + 1)"
+        "Rod $(div(i - sidx.rod[1], ROD_STATE_VARS) + 1), var $(mod(i - sidx.rod[1], ROD_STATE_VARS) + 1)"
     elseif i in sidx.cone
-        "Cone $(div(i - sidx.cone[1], 6) + 1), var $(mod(i - sidx.cone[1], 6) + 1)"
+        "Cone $(div(i - sidx.cone[1], CONE_STATE_VARS) + 1), var $(mod(i - sidx.cone[1], CONE_STATE_VARS) + 1)"
     elseif i in sidx.hc
         "HC $(div(i - sidx.hc[1], 3) + 1), var $(mod(i - sidx.hc[1], 3) + 1)"
     elseif i in sidx.on_bc

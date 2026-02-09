@@ -22,18 +22,21 @@ const ROD_CGMP_INDEX = 18
 
 const MS_PER_S = 1.0e-3
 
-@inline function _safe_positive(x::Real, floor::Float64=1.0e-9)
-    return max(Float64(x), floor)
+@inline function _safe_positive(x::Real, floor::Real=1.0e-9)
+    floor_x = oftype(x, floor)
+    return ifelse(x > floor_x, x, floor_x)
 end
 
 @inline function _safe_exp(x::Real)
-    return exp(clamp(Float64(x), -60.0, 60.0))
+    lo = oftype(x, -60.0)
+    hi = oftype(x, 60.0)
+    return exp(clamp(x, lo, hi))
 end
 
 @inline function _rate_fraction(scale::Real, x::Real, width::Real, limit_value::Real)
     den = _safe_exp(x / width) - 1.0
-    if abs(den) < 1.0e-9
-        return limit_value
+    if abs(den) < oftype(den, 1.0e-9)
+        return oftype(x, limit_value)
     end
     return scale * x / den
 end
@@ -206,7 +209,7 @@ function update_photoreceptor!(du, u, params::PhototransductionParams,
     du[1] = params.eta * Phi - R_star / params.tau_R
 
     Ca_clamped = max(Ca, 1.0e-6)
-    Ca_ratio = (params.Ca_dark / Ca_clamped)^params.n_Ca
+    Ca_ratio = min((params.Ca_dark / Ca_clamped)^params.n_Ca, 100.0)
     G_clamped = max(G, 0.0)
     du[2] = params.alpha_G * Ca_ratio - params.beta_G * (1.0 + params.gamma_PDE * R_star) * G_clamped
 

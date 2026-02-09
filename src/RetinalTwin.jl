@@ -49,10 +49,13 @@ include("validation/targets.jl")
 # --- Public API ---
 export
     # Types
-    MLParams, PhototransductionParams, NTReleaseParams,
+    MLParams, PhototransductionParams, RodPhotoreceptorParams, NTReleaseParams,
     SynapseParams, mGluR6Params, MullerParams, RPEParams,
     ERGWeights, StimulusProtocol, PopulationSizes,
     RetinalColumn, StateIndex, ConnectionDef,
+    # State layout constants
+    ROD_STATE_VARS, CONE_STATE_VARS,
+    ROD_V_INDEX, ROD_GLU_INDEX, CONE_V_INDEX, CONE_GLU_INDEX,
     # Parameter factories
     build_retinal_column,
     default_rod_params, default_cone_params,

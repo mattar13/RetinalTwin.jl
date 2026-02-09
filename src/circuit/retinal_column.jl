@@ -46,7 +46,7 @@ function dark_adapted_state(col::RetinalColumn, sidx::StateIndex)
         u0[offset + 2] = col.cone_params.Ca_dark
         u0[offset + 3] = -40.0
         u0[offset + 4] = 0.0
-        u0[offset + 5] = 0.5
+        u0[offset + CONE_GLU_INDEX - 1] = 0.5
     end
 
     # Horizontal cells: partially depolarized by tonic glutamate
