@@ -22,27 +22,16 @@ const ROD_CGMP_INDEX = 18
 
 const MS_PER_S = 1.0e-3
 
-@inline function _safe_positive(x::Real, floor::Real=1.0e-9)
-    floor_x = oftype(x, floor)
-    return ifelse(x > floor_x, x, floor_x)
-end
-
-@inline function _safe_exp(x::Real)
-    lo = oftype(x, -60.0)
-    hi = oftype(x, 60.0)
-    return exp(clamp(x, lo, hi))
-end
-
-@inline function _rate_fraction(scale::Real, x::Real, width::Real, limit_value::Real)
-    den = _safe_exp(x / width) - 1.0
+@inline function rate_fraction(scale::Real, x::Real, width::Real, limit_value::Real)
+    den = exp(x / width) - 1.0
     if abs(den) < oftype(den, 1.0e-9)
         return oftype(x, limit_value)
     end
     return scale * x / den
 end
 
-@inline function _release_sigmoid(V::Real, V_half::Real, V_slope::Real)
-    return 1.0 / (1.0 + _safe_exp(-(V - V_half) / V_slope))
+@inline function release_sigmoid(V::Real, V_half::Real, V_slope::Real)
+    return 1.0 / (1.0 + exp(-(V - V_half) / V_slope))
 end
 
 """
@@ -51,7 +40,7 @@ end
 Steady-state glutamate release drive from rod membrane potential.
 """
 function rod_glutamate_release(V::Real, params::RodPhotoreceptorParams)
-    return _release_sigmoid(V, params.V_Glu_half, params.V_Glu_slope)
+    return release_sigmoid(V, params.V_Glu_half, params.V_Glu_slope)
 end
 
 """
@@ -124,18 +113,18 @@ function update_rod_photoreceptor!(du, u, params::RodPhotoreceptorParams,
     cGMP      = u[ROD_CGMP_INDEX]
     Glu       = u[ROD_GLU_INDEX]
 
-    Ca_s_pos = _safe_positive(Ca_s)
-    Ca_f_pos = _safe_positive(Ca_f)
-    Ca_photo_pos = _safe_positive(Ca_photo)
-    cGMP_pos = max(cGMP, 0.0)
+    Ca_s_pos = Ca_s
+    Ca_f_pos = Ca_f
+    Ca_photo_pos = Ca_photo
+    cGMP_pos = cGMP
 
     # Light drive. Phi is photons/um^2/ms; convert to Rh*/s.
-    Jhv = params.eta * max(Phi, 0.0) * 1000.0
+    Jhv = params.eta * Phi * 1000.0
 
     # --- Phototransduction ---
-    T_free = max(params.T_tot - Tr, 0.0)
-    PDE_free = max(params.PDE_tot - PDE, 0.0)
-    cab_photo_free = max(params.eT - Cab_photo, 0.0)
+    T_free = params.T_tot - Tr
+    PDE_free = params.PDE_tot - PDE
+    cab_photo_free = params.eT - Cab_photo
 
     dRh_s = Jhv - params.alpha1 * Rh + params.alpha2 * Rhi
     dRhi_s = params.alpha1 * Rh - (params.alpha2 + params.alpha3) * Rhi
@@ -144,7 +133,7 @@ function update_rod_photoreceptor!(du, u, params::RodPhotoreceptorParams,
 
     cGMP3 = cGMP_pos^3
     J = params.J_max * cGMP3 / (cGMP3 + 1000.0)
-    Iphoto = -J * (1.0 - _safe_exp((V - 8.5) / 17.0))
+    Iphoto = -J * (1.0 - exp((V - 8.5) / 17.0))
 
     dCa_photo_s = params.b * J - params.gamma_Ca * (Ca_photo - params.C0) -
                   params.k1 * cab_photo_free * Ca_photo + params.k2 * Cab_photo
@@ -153,27 +142,27 @@ function update_rod_photoreceptor!(du, u, params::RodPhotoreceptorParams,
     dcGMP_s = cyclase - cGMP * (params.nu + params.sigma * PDE)
 
     # --- Ionic currents ---
-    alpha_mKv = _rate_fraction(5.0, 100.0 - V, 42.0, 210.0)
-    beta_mKv = 9.0 * _safe_exp(-(V - 20.0) / 40.0)
-    alpha_hKv = 0.15 * _safe_exp(-V / 22.0)
-    beta_hKv = 0.4125 / (_safe_exp((40.0 - V) / 7.0) + 1.0)
+    alpha_mKv = rate_fraction(5.0, 100.0 - V, 42.0, 210.0)
+    beta_mKv = 9.0 * exp(-(V - 20.0) / 40.0)
+    alpha_hKv = 0.15 * exp(-V / 22.0)
+    beta_hKv = 0.4125 / (exp((40.0 - V) / 7.0) + 1.0)
 
-    alpha_mCa = _rate_fraction(3.0, 80.0 - V, 25.0, 75.0)
-    beta_mCa = 10.0 / (1.0 + _safe_exp((V + 38.0) / 7.0))
-    hCa = 1.0 / (1.0 + _safe_exp((V - 40.0) / 18.0))
+    alpha_mCa = rate_fraction(3.0, 80.0 - V, 25.0, 75.0)
+    beta_mCa = 10.0 / (1.0 + exp((V + 38.0) / 7.0))
+    hCa = 1.0 / (1.0 + exp((V - 40.0) / 18.0))
 
-    alpha_mKCa = _rate_fraction(15.0, 80.0 - V, 40.0, 600.0)
-    beta_mKCa = 20.0 * _safe_exp(-V / 35.0)
+    alpha_mKCa = rate_fraction(15.0, 80.0 - V, 40.0, 600.0)
+    beta_mKCa = 20.0 * exp(-V / 35.0)
 
     IKv = params.g_Kv * mKv^3 * hKv * (V - params.E_K)
     ECa = 12.5 * log(Ca_s_pos / params.Ca_o)
     ICa = params.g_Ca * mCa^4 * hCa * (V - ECa)
-    mCl = 1.0 / (1.0 + _safe_exp((0.37 - Ca_s_pos) / 0.09))
+    mCl = 1.0 / (1.0 + exp((0.37 - Ca_s_pos) / 0.09))
     IClCa = params.g_Cl * mCl * (V - params.E_Cl)
     mKCa_inf = Ca_s_pos / (Ca_s_pos + 0.3)
     IKCa = params.g_KCa * mKCa^2 * mKCa_inf * (V - params.E_K)
 
-    h_inf = 1.0 / (1.0 + _safe_exp((V - params.V_h_half) / params.k_h))
+    h_inf = 1.0 / (1.0 + exp((V - params.V_h_half) / params.k_h))
     Ih = params.g_H * h_inf * (V - params.E_H)
     IL = params.g_L * (V - params.E_L)
 
@@ -183,10 +172,10 @@ function update_rod_photoreceptor!(du, u, params::RodPhotoreceptorParams,
     du[ROD_V_INDEX] = (-Iphoto - Ih - IKv - ICa - IClCa - IKCa - IL - Iex - Iex2 + I_feedback) / params.C_m
 
     # --- Calcium compartments ---
-    cab_ls_free = max(params.B_L - Cab_ls, 0.0)
-    cab_hs_free = max(params.B_H - Cab_hs, 0.0)
-    cab_lf_free = max(params.B_L - Cab_lf, 0.0)
-    cab_hf_free = max(params.B_H - Cab_hf, 0.0)
+    cab_ls_free = params.B_L - Cab_ls
+    cab_hs_free = params.B_H - Cab_hs
+    cab_lf_free = params.B_L - Cab_lf
+    cab_hf_free = params.B_H - Cab_hf
 
     diffusion_s = params.D_Ca * (params.S1 / (params.delta * params.V1)) * (Ca_s - Ca_f)
     diffusion_f = params.D_Ca * (params.S1 / (params.delta * params.V2)) * (Ca_s - Ca_f)
@@ -250,14 +239,12 @@ function update_photoreceptor!(du, u, params::PhototransductionParams,
     # Phototransduction cascade
     du[1] = params.eta * Phi - R_star / params.tau_R
 
-    Ca_clamped = max(Ca, 1.0e-6)
-    Ca_ratio = min((params.Ca_dark / Ca_clamped)^params.n_Ca, 100.0)
-    G_clamped = max(G, 0.0)
-    du[2] = params.alpha_G * Ca_ratio - params.beta_G * (1.0 + params.gamma_PDE * R_star) * G_clamped
+    Ca_ratio = min((params.Ca_dark / Ca)^params.n_Ca, 100.0)
+    du[2] = params.alpha_G * Ca_ratio - params.beta_G * (1.0 + params.gamma_PDE * R_star) * G
 
-    G_norm = (G_clamped / params.G_dark)^params.n_G
+    G_norm = (G / params.G_dark)^params.n_G
     I_CNG = params.g_CNG_max * G_norm * (V - params.E_CNG)
-    du[3] = (I_CNG * params.f_Ca - params.k_ex * Ca_clamped) / params.B_Ca
+    du[3] = (I_CNG * params.f_Ca - params.k_ex * Ca) / params.B_Ca
 
     # Membrane currents
     h_inf = 1.0 / (1.0 + exp((V - params.V_h_half) / params.k_h))
@@ -285,7 +272,7 @@ function photoreceptor_K_current(u, params::RodPhotoreceptorParams)
     mKv = u[ROD_MKV_INDEX]
     hKv = u[ROD_HKV_INDEX]
     mKCa = u[ROD_MKCA_INDEX]
-    Ca_s = _safe_positive(u[ROD_CA_S_INDEX])
+    Ca_s = u[ROD_CA_S_INDEX]
 
     IKv = params.g_Kv * mKv^3 * hKv * (V - params.E_K)
     mKCa_inf = Ca_s / (Ca_s + 0.3)
