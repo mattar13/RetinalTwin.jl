@@ -37,6 +37,7 @@ include("circuit/retinal_column.jl")
 include("erg/field_potential.jl")
 
 # --- Simulation ---
+include("simulation/cell_rhs.jl")
 include("simulation/ode_system.jl")
 include("simulation/run.jl")
 
@@ -68,7 +69,11 @@ export
     compute_stimulus, flash_stimulus,
     # Simulation
     simulate_flash, extract_voltages, extract_neurotransmitters,
-    dark_adapted_state, retinal_column_rhs!,
+    dark_adapted_state, retinal_column_rhs!, zipper_rhs!,
+    rod_cell_rhs!, cone_cell_rhs!,
+    horizontal_cell_rhs!, on_bipolar_cell_rhs!, off_bipolar_cell_rhs!,
+    a2_cell_rhs!, gaba_cell_rhs!, da_cell_rhs!, ganglion_cell_rhs!,
+    muller_cell_rhs!, rpe_cell_rhs!,
     # ERG
     compute_erg, extract_ops,
     # Visualization
