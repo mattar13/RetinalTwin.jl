@@ -4,18 +4,12 @@
 # ============================================================
 
 """
-    retinal_column_rhs!(du, u, p, t)
+    zipper_rhs!(du, u, p, t)
 
-In-place ODE right-hand side for the full retinal column.
+Zipper the global state/params into per-cell RHS calls.
 `p = (col::RetinalColumn, sidx::StateIndex, connections::Vector{ConnectionDef})`.
-
-This function:
-1. Computes stimulus
-2. Reads population-averaged neurotransmitter concentrations
-3. Computes synaptic currents for each postsynaptic cell
-4. Updates each cell type's derivatives
 """
-function retinal_column_rhs!(du, u, p, t)
+function zipper_rhs!(du, u, p, t)
     col, sidx, conns = p
     pop = col.pop
 
@@ -66,17 +60,17 @@ function retinal_column_rhs!(du, u, p, t)
     # Photoreceptors (rods)
     for i in 1:pop.n_rod
         offset = sidx.rod[1] + (i - 1) * ROD_STATE_VARS
-        update_rod_photoreceptor!(view(du, offset:offset + ROD_STATE_VARS - 1),
-                                  view(u, offset:offset + ROD_STATE_VARS - 1),
-                                  col.rod_params, Phi, I_hc_fb)
+        rod_cell_rhs!(view(du, offset:offset + ROD_STATE_VARS - 1),
+                      view(u, offset:offset + ROD_STATE_VARS - 1),
+                      (col.rod_params, Phi, I_hc_fb), t)
     end
 
     # Photoreceptors (cones)
     for i in 1:pop.n_cone
         offset = sidx.cone[1] + (i - 1) * CONE_STATE_VARS
-        update_photoreceptor!(view(du, offset:offset + CONE_STATE_VARS - 1),
-                              view(u, offset:offset + CONE_STATE_VARS - 1),
-                              col.cone_params, Phi, I_hc_fb)
+        cone_cell_rhs!(view(du, offset:offset + CONE_STATE_VARS - 1),
+                       view(u, offset:offset + CONE_STATE_VARS - 1),
+                       (col.cone_params, Phi, I_hc_fb), t)
     end
 
     # Horizontal cells
@@ -98,12 +92,9 @@ function retinal_column_rhs!(du, u, p, t)
             end
         end
 
-        update_horizontal!(view(du, offset:offset+2),
-                          view(u, offset:offset+2),
-                          col.hc_params, I_exc, I_gap)
-
-        # Update s_Glu tracking for HC (overrides the zero from update_horizontal!)
-        du[offset + 2] = (glu_pr_mean - s_glu) / 3.0  # tau = 3 ms
+        horizontal_cell_rhs!(view(du, offset:offset+2),
+                             view(u, offset:offset+2),
+                             (col.hc_params, I_exc, I_gap, glu_pr_mean), t)
     end
 
     # ON-Bipolar cells
@@ -117,10 +108,9 @@ function retinal_column_rhs!(du, u, p, t)
         # Modulatory: dopamine gain
         I_mod = 0.0  # dopamine modulates TRPM1 gain inside update_on_bipolar
 
-        update_on_bipolar!(view(du, offset:offset+3),
-                          view(u, offset:offset+3),
-                          col.on_params, col.mglur6_params,
-                          glu_pr_mean, I_inh, I_mod)
+        on_bipolar_cell_rhs!(view(du, offset:offset+3),
+                             view(u, offset:offset+3),
+                             (col.on_params, col.mglur6_params, glu_pr_mean, I_inh, I_mod), t)
     end
 
     # OFF-Bipolar cells
@@ -134,10 +124,9 @@ function retinal_column_rhs!(du, u, p, t)
 
         I_mod = 0.0
 
-        update_off_bipolar!(view(du, offset:offset+3),
-                           view(u, offset:offset+3),
-                           col.off_params,
-                           glu_pr_mean, I_inh, I_mod)
+        off_bipolar_cell_rhs!(view(du, offset:offset+3),
+                              view(u, offset:offset+3),
+                              (col.off_params, glu_pr_mean, I_inh, I_mod), t)
     end
 
     # A2 Amacrine cells
@@ -154,9 +143,9 @@ function retinal_column_rhs!(du, u, p, t)
         # Modulatory: dopamine
         I_mod_a2 = -da_mean * 1.0 * (V_a2 - (-60.0))  # reduces excitability
 
-        update_a2!(view(du, offset:offset+2),
-                  view(u, offset:offset+2),
-                  col.a2_params, I_exc, I_inh, I_mod_a2)
+        a2_cell_rhs!(view(du, offset:offset+2),
+                     view(u, offset:offset+2),
+                     (col.a2_params, I_exc, I_inh, I_mod_a2), t)
     end
 
     # GABAergic Amacrine cells
@@ -173,9 +162,9 @@ function retinal_column_rhs!(du, u, p, t)
         # Modulatory: dopamine
         I_mod_gaba = -da_mean * 1.0 * (V_gaba - (-60.0))
 
-        update_gaba_amacrine!(view(du, offset:offset+2),
-                             view(u, offset:offset+2),
-                             col.gaba_params, I_exc, I_inh, I_mod_gaba)
+        gaba_cell_rhs!(view(du, offset:offset+2),
+                       view(u, offset:offset+2),
+                       (col.gaba_params, I_exc, I_inh, I_mod_gaba), t)
     end
 
     # DA Amacrine cells
@@ -186,9 +175,9 @@ function retinal_column_rhs!(du, u, p, t)
         # Excitatory: glutamate from ON-bipolars
         I_exc = synaptic_current(3.0, glu_on_mean, V_da, 0.0)
 
-        update_da_amacrine!(view(du, offset:offset+2),
-                           view(u, offset:offset+2),
-                           col.da_params, I_exc)
+        da_cell_rhs!(view(du, offset:offset+2),
+                     view(u, offset:offset+2),
+                     (col.da_params, I_exc), t)
     end
 
     # Ganglion cells
@@ -204,27 +193,43 @@ function retinal_column_rhs!(du, u, p, t)
         I_inh = synaptic_current(3.0, gly_a2_mean, V_gc, -80.0) +
                 synaptic_current(3.0, gaba_mean, V_gc, -70.0)
 
-        update_ganglion!(view(du, offset:offset+1),
-                        view(u, offset:offset+1),
-                        col.gc_params, I_exc, I_inh)
+        ganglion_cell_rhs!(view(du, offset:offset+1),
+                           view(u, offset:offset+1),
+                           (col.gc_params, I_exc, I_inh), t)
     end
 
     # Müller glia
     for i in 1:pop.n_muller
         offset = sidx.muller[1] + (i - 1) * 4
-        update_muller!(view(du, offset:offset+3),
-                      view(u, offset:offset+3),
-                      col.muller_params,
-                      total_I_K, total_glu_release * 0.01)
+        muller_cell_rhs!(view(du, offset:offset+3),
+                         view(u, offset:offset+3),
+                         (col.muller_params, total_I_K, total_glu_release * 0.01), t)
     end
 
     # RPE
     for i in 1:pop.n_rpe
         offset = sidx.rpe[1] + (i - 1) * 2
-        update_rpe!(view(du, offset:offset+1),
-                   view(u, offset:offset+1),
-                   col.rpe_params, total_I_K)
+        rpe_cell_rhs!(view(du, offset:offset+1),
+                      view(u, offset:offset+1),
+                      (col.rpe_params, total_I_K), t)
     end
 
+    return nothing
+end
+
+"""
+    retinal_column_rhs!(du, u, p, t)
+
+In-place ODE right-hand side for the full retinal column.
+`p = (col::RetinalColumn, sidx::StateIndex, connections::Vector{ConnectionDef})`.
+
+This function:
+1. Computes stimulus
+2. Reads population-averaged neurotransmitter concentrations
+3. Computes synaptic currents for each postsynaptic cell
+4. Updates each cell type's derivatives
+"""
+function retinal_column_rhs!(du, u, p, t)
+    zipper_rhs!(du, u, p, t)
     return nothing
 end
