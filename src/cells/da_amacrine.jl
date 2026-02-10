@@ -1,38 +1,120 @@
 # ============================================================
-# da_amacrine.jl — Dopaminergic amacrine cell
-# State vector: [V, w, DA] (3 variables per cell)
-# Spec §3.7 — Modulatory, slow dopamine release
+# da_amacrine.jl - Dopaminergic Amacrine cell dynamics
 # ============================================================
 
+# ── State indices ───────────────────────────────────────────
+
+const DA_STATE_VARS = 3
+const DA_V_INDEX = 1
+const DA_W_INDEX = 2
+const DA_DA_INDEX = 3
+
+# ── 1. Default Parameters ───────────────────────────────────
+
 """
-    update_da_amacrine!(du, u, ml::MLParams, I_exc)
+    default_da_params()
 
-Compute derivatives for one dopaminergic amacrine cell.
-`u = [V, w, DA]`.
-Receives excitatory input from ON-bipolars. Releases dopamine slowly (tau ~ 200 ms).
+Return default parameters for the dopaminergic amacrine cell model as a named tuple.
+Parameters are loaded from da_amacrine_params.csv.
 """
-function update_da_amacrine!(du, u, ml::MLParams, I_exc::Real)
-    V  = u[1]
-    w  = u[2]
-    DA = u[3]
+function default_da_params()
+    return default_da_params_csv()
+end
 
-    # ML activation functions
-    m_inf = 0.5 * (1.0 + tanh((V - ml.V1) / ml.V2))
-    w_inf = 0.5 * (1.0 + tanh((V - ml.V3) / ml.V4))
-    tau_w = 1.0 / cosh((V - ml.V3) / (2.0 * ml.V4))
+# ── 2. Initial Conditions ───────────────────────────────────
 
-    # Membrane potential (only excitatory input in Phase 1)
-    du[1] = (-ml.g_L * (V - ml.E_L) -
-              ml.g_Ca * m_inf * (V - ml.E_Ca) -
-              ml.g_K * w * (V - ml.E_K) +
-              I_exc) / ml.C_m
+"""
+    da_dark_state(params)
 
-    # Recovery variable
-    du[2] = ml.phi * (w_inf - w) / max(tau_w, 0.1)
+Return dark-adapted initial conditions for a dopaminergic amacrine cell.
+
+# Arguments
+- `params`: named tuple from `default_da_params()`
+
+# Returns
+- 3-element state vector [V, w, DA]
+"""
+function da_dark_state(params)
+    u0 = zeros(DA_STATE_VARS)
+    u0[DA_V_INDEX] = -60.0      # Resting potential
+    u0[DA_W_INDEX] = 0.01       # Small recovery variable
+    u0[DA_DA_INDEX] = 0.0       # No dopamine release at rest
+    return u0
+end
+
+# ── 3. Auxiliary Functions ──────────────────────────────────
+
+# Use shared ML functions from horizontal.jl
+# m_inf_ml(V, V1, V2), w_inf_ml(V, V3, V4), tau_w_ml(V, V3, V4)
+
+# ── 4. Mathematical Model ───────────────────────────────────
+
+"""
+    da_model!(du, u, p, t)
+
+Morris-Lecar dopaminergic amacrine cell model.
+
+# Arguments
+- `du`: derivative vector (3 elements)
+- `u`: state vector (3 elements)
+- `p`: tuple `(params, I_exc)` where:
+  - `params`: named tuple from `default_da_params()`
+  - `I_exc`: excitatory synaptic current from ON-bipolars (pA)
+- `t`: time (ms)
+
+# State vector
+`u = [V, w, DA]`
+
+# Notes
+Modulatory cell with slow dopamine release (tau ~ 200 ms).
+Receives excitatory input from ON-bipolars.
+"""
+function da_model!(du, u, p, t)
+    params, I_exc = p
+
+    # Decompose state vector using tuple unpacking
+    V, w, DA = u
+
+    # Extract Morris-Lecar parameters
+    C_m = params.C_m
+    g_L = params.g_L
+    g_Ca = params.g_Ca
+    g_K = params.g_K
+    E_L = params.E_L
+    E_Ca = params.E_Ca
+    E_K = params.E_K
+    V1 = params.V1
+    V2 = params.V2
+    V3 = params.V3
+    V4 = params.V4
+    phi = params.phi
+
+    # Extract dopamine release parameters
+    alpha_DA = params.alpha_DA
+    V_DA_half = params.V_DA_half
+    V_DA_slope = params.V_DA_slope
+    tau_DA = params.tau_DA
+
+    # Morris-Lecar activation functions
+    m_inf = m_inf_ml(V, V1, V2)
+    w_inf = w_inf_ml(V, V3, V4)
+    tau_w = tau_w_ml(V, V3, V4)
+
+    # Membrane currents
+    I_L = g_L * (V - E_L)
+    I_Ca = g_Ca * m_inf * (V - E_Ca)
+    I_K = g_K * w * (V - E_K)
+
+    # Derivatives
+    dV = (-I_L - I_Ca - I_K + I_exc) / C_m
+    dw = phi * (w_inf - w) / max(tau_w, 0.1)
 
     # Dopamine release (very slow)
-    T_inf = 1.0 / (1.0 + exp(-(V - ml.release.V_half) / ml.release.V_slope))
-    du[3] = (ml.release.alpha * T_inf - DA) / ml.release.tau
+    T_inf = 1.0 / (1.0 + exp(-(V - V_DA_half) / V_DA_slope))
+    dDA = (alpha_DA * T_inf - DA) / tau_DA
+
+    # Assign derivatives
+    du .= [dV, dw, dDA]
 
     return nothing
 end

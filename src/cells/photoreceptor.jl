@@ -192,7 +192,7 @@ function rod_model!(du, u, p, t)
     kREC = params.kREC
     G0 = params.G0
     iDARK = params.iDARK
-    kg = params.kg
+    kg = params.kg #TODO: Figure out why this isn't used
     C_m = params.C_m
     gLEAK = params.gLEAK
     eLEAK = params.ELEAK
