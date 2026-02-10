@@ -1,0 +1,1072 @@
+{
+  "meta": {
+    "version": "0.1.0",
+    "created": "2026-02-08",
+    "description": "Retinal Disease Lexicon for ERG Digital Twin — structured knowledge base mapping diseases to affected cell types, ERG signatures, model parameter changes, and available treatments.",
+    "schema_version": "1.0",
+    "curator": "Matt Tarchick / Claude",
+    "model_reference": "retinal_digital_twin_spec.md"
+  },
+
+  "cell_types": {
+    "rod": { "label": "Rod Photoreceptor", "layer": "ONL", "model_vars": ["R_star", "G", "Ca", "V", "h", "Glu"], "param_group": "phototrans" },
+    "cone": { "label": "Cone Photoreceptor", "layer": "ONL", "model_vars": ["R_star", "G", "Ca", "V", "h", "Glu"], "param_group": "phototrans" },
+    "hc": { "label": "Horizontal Cell", "layer": "OPL", "model_vars": ["V", "w"], "param_group": "on_pathway" },
+    "on_bc": { "label": "ON-Bipolar Cell", "layer": "INL", "model_vars": ["V", "w", "S_mGluR6", "Glu"], "param_group": "on_pathway" },
+    "off_bc": { "label": "OFF-Bipolar Cell", "layer": "INL", "model_vars": ["V", "w", "s_Glu", "Glu"], "param_group": "on_pathway" },
+    "a2": { "label": "AII Amacrine Cell", "layer": "INL/IPL", "model_vars": ["V", "w", "Gly"], "param_group": "amacrine" },
+    "gaba_ac": { "label": "GABAergic Amacrine Cell", "layer": "INL/IPL", "model_vars": ["V", "w", "GABA"], "param_group": "amacrine" },
+    "da_ac": { "label": "Dopaminergic Amacrine Cell", "layer": "INL/IPL", "model_vars": ["V", "w", "DA"], "param_group": "amacrine" },
+    "rgc": { "label": "Retinal Ganglion Cell", "layer": "GCL", "model_vars": ["V", "w"], "param_group": "erg_weights" },
+    "muller": { "label": "Müller Glia", "layer": "spanning", "model_vars": ["V_M", "K_o_end", "K_o_stalk", "Glu_o"], "param_group": "slow" },
+    "rpe": { "label": "Retinal Pigment Epithelium", "layer": "RPE", "model_vars": ["V_RPE", "K_sub"], "param_group": "slow" },
+    "vasculature": { "label": "Retinal Vasculature", "layer": "multiple", "model_vars": [], "param_group": null, "note": "Not directly modeled in current ODE system; affects cell types indirectly via ischemia" }
+  },
+
+  "erg_components": {
+    "a_wave": { "label": "a-wave", "generators": ["rod", "cone"], "polarity": "negative", "timing_ms": [5, 30], "description": "Initial negative deflection reflecting photoreceptor hyperpolarization" },
+    "b_wave": { "label": "b-wave", "generators": ["on_bc", "muller"], "polarity": "positive", "timing_ms": [30, 80], "description": "Positive deflection driven by ON-bipolar depolarization and Müller cell currents" },
+    "ops": { "label": "Oscillatory Potentials", "generators": ["a2", "gaba_ac"], "polarity": "mixed", "timing_ms": [15, 55], "frequency_hz": [100, 160], "description": "High-frequency wavelets on b-wave ascending limb from amacrine reciprocal inhibition" },
+    "d_wave": { "label": "d-wave", "generators": ["off_bc", "cone"], "polarity": "positive", "timing_ms": "at_offset", "description": "OFF-response at light offset, prominent in photopic conditions" },
+    "p3": { "label": "P3 (slow PIII)", "generators": ["muller"], "polarity": "negative", "timing_ms": [100, 500], "description": "Slow negative component from Müller cell K+ buffering" },
+    "c_wave": { "label": "c-wave", "generators": ["rpe"], "polarity": "positive", "timing_ms": [2000, 5000], "description": "Slow positive component from RPE response to subretinal K+ decrease" },
+    "phnr": { "label": "PhNR", "generators": ["rgc"], "polarity": "negative", "timing_ms": [60, 100], "description": "Photopic negative response reflecting retinal ganglion cell function" },
+    "scotopic_threshold": { "label": "Scotopic Threshold Response", "generators": ["rgc", "a2"], "polarity": "negative", "timing_ms": [100, 200], "description": "Near-threshold scotopic response from proximal retina" }
+  },
+
+  "diseases": [
+    {
+      "id": "rp_rod_cone",
+      "name": "Retinitis Pigmentosa (Rod-Cone Dystrophy)",
+      "category": "inherited_retinal_dystrophy",
+      "subcategory": "rod_cone_dystrophy",
+      "inheritance": ["autosomal_dominant", "autosomal_recessive", "x_linked"],
+      "prevalence": "1:4000",
+      "onset": "variable (childhood to adult)",
+      "genes": ["RHO", "USH2A", "RPGR", "RP1", "PRPF31", "PRPH2", "RPE65", "CNGA1", "PDE6A", "PDE6B", "NR2E3", "CRB1", "TULP1", "CERKL"],
+      "progression": "progressive",
+
+      "cell_effects": [
+        {
+          "cell_type": "rod",
+          "effect": "primary_degeneration",
+          "mechanism": "Outer segment shortening → photoreceptor apoptosis, centripetal from periphery to center",
+          "temporal_course": "early",
+          "severity": "severe"
+        },
+        {
+          "cell_type": "cone",
+          "effect": "secondary_degeneration",
+          "mechanism": "Loss of rod-derived cone viability factor (RdCVF), oxidative stress from excess O2 in thinned outer retina",
+          "temporal_course": "mid_to_late",
+          "severity": "moderate_to_severe"
+        },
+        {
+          "cell_type": "muller",
+          "effect": "reactive_gliosis",
+          "mechanism": "GFAP upregulation, hypertrophy, formation of glial seal, altered K+ buffering",
+          "temporal_course": "mid",
+          "severity": "moderate"
+        },
+        {
+          "cell_type": "on_bc",
+          "effect": "dendritic_retraction",
+          "mechanism": "Loss of presynaptic input from photoreceptors triggers inner retinal remodeling",
+          "temporal_course": "late",
+          "severity": "moderate"
+        },
+        {
+          "cell_type": "rpe",
+          "effect": "secondary_dysfunction",
+          "mechanism": "Pigment migration into neural retina (bone spicule pattern), RPE atrophy",
+          "temporal_course": "mid_to_late",
+          "severity": "moderate"
+        }
+      ],
+
+      "erg_signature": {
+        "scotopic": {
+          "a_wave": { "amplitude": "reduced_to_absent", "implicit_time": "delayed", "note": "Earliest and most severely affected" },
+          "b_wave": { "amplitude": "reduced_to_absent", "implicit_time": "delayed", "note": "b-wave implicit time delay is hallmark of progressive RP vs. CSNB" },
+          "ops": { "amplitude": "absent_early", "note": "Lost before a-wave and b-wave become unrecordable" }
+        },
+        "photopic": {
+          "a_wave": { "amplitude": "reduced_late", "implicit_time": "delayed_late" },
+          "b_wave": { "amplitude": "reduced", "implicit_time": "delayed" },
+          "flicker_30hz": { "amplitude": "reduced", "implicit_time": "delayed", "note": "30Hz flicker delay is sensitive marker; used for monitoring progression" }
+        },
+        "diagnostic_pattern": "Scotopic responses reduced/absent with delayed implicit times before photopic changes. Progressive amplitude reduction correlates with photoreceptor loss area on OCT.",
+        "electronegative": false,
+        "progression_markers": ["scotopic_b_wave_amplitude_decline_rate", "30hz_flicker_implicit_time", "30hz_flicker_amplitude"]
+      },
+
+      "model_parameter_changes": [
+        { "param": "N_rod", "direction": "decrease", "magnitude": "0.1-1.0 (fraction remaining)", "stage": "early_to_late", "note": "Primary: progressive rod loss" },
+        { "param": "g_CNG_rod", "direction": "decrease", "magnitude": "0.3-0.8x", "stage": "early", "note": "Outer segment shortening reduces CNG channels" },
+        { "param": "τ_R_rod", "direction": "increase", "magnitude": "1.5-3x", "stage": "early", "note": "Impaired phototransduction kinetics" },
+        { "param": "N_cone", "direction": "decrease", "magnitude": "0.3-1.0 (fraction remaining)", "stage": "mid_to_late", "note": "Secondary cone loss" },
+        { "param": "g_Kir_end", "direction": "decrease", "magnitude": "0.5-0.8x", "stage": "mid", "note": "Müller gliosis alters K+ buffering" },
+        { "param": "w_rod", "direction": "decrease", "magnitude": "proportional to N_rod", "stage": "early_to_late" },
+        { "param": "w_on", "direction": "decrease", "magnitude": "0.5-0.8x", "stage": "late", "note": "Inner retinal remodeling reduces ON-pathway contribution" }
+      ],
+
+      "staging": [
+        {
+          "stage": "early",
+          "clinical": "Night blindness, mid-peripheral visual field loss, minimal fundus changes",
+          "erg": "Scotopic b-wave reduced and delayed; photopic near-normal; OPs absent",
+          "oct": "Peripheral EZ band disruption; central structure preserved",
+          "model_state": "N_rod ~0.5-0.7, g_CNG_rod ~0.6x, all other params near normal"
+        },
+        {
+          "stage": "moderate",
+          "clinical": "Ring scotoma, bone spicule pigment, attenuated vessels, waxy disc pallor",
+          "erg": "Scotopic responses severely reduced or absent; photopic reduced and delayed",
+          "oct": "EZ band loss extending toward macula; CME may be present",
+          "model_state": "N_rod ~0.1-0.3, N_cone ~0.5-0.7, g_Kir reduced, ON-pathway params shifting"
+        },
+        {
+          "stage": "advanced",
+          "clinical": "Tunnel vision, severe nyctalopia, macular involvement",
+          "erg": "All responses extinguished or near-extinguished",
+          "oct": "Widespread EZ loss, foveal thinning, epiretinal membrane",
+          "model_state": "N_rod ~0, N_cone ~0.1-0.3, significant inner retinal remodeling"
+        }
+      ],
+
+      "treatments": [
+        {
+          "name": "Voretigene neparvovec (Luxturna)",
+          "type": "gene_therapy",
+          "target_gene": "RPE65",
+          "status": "FDA_approved_2017",
+          "mechanism": "AAV2-delivered RPE65 gene replacement restores visual cycle in RPE cells",
+          "eligible_genotype": "biallelic RPE65 mutations",
+          "erg_effect": "Improved FST (full-field sensitivity threshold); limited ERG amplitude recovery",
+          "references": ["Russell et al. Lancet 2017", "Maguire et al. Ophthalmology 2019"]
+        },
+        {
+          "name": "RPGR gene therapy (multiple trials)",
+          "type": "gene_therapy",
+          "target_gene": "RPGR",
+          "status": "phase_2_3",
+          "mechanism": "AAV-delivered RPGR for X-linked RP",
+          "eligible_genotype": "RPGR mutations (X-linked RP)",
+          "erg_effect": "Stabilization of retinal sensitivity; microperimetry improvement",
+          "references": ["Cehajic-Kapetanovic et al. Nat Med 2020"]
+        },
+        {
+          "name": "OCU400 (NR2E3 modifier therapy)",
+          "type": "gene_therapy",
+          "target_gene": "NR2E3 (gene-agnostic modifier)",
+          "status": "phase_1_2",
+          "mechanism": "Modified NR2E3 modulates retinal homeostasis across multiple RP genotypes",
+          "eligible_genotype": "multiple RP genotypes",
+          "references": ["Ocugen clinical program"]
+        },
+        {
+          "name": "Vitamin A palmitate supplementation",
+          "type": "nutritional",
+          "status": "standard_of_care",
+          "mechanism": "Slows ERG amplitude decline (~20% slower per year)",
+          "references": ["Berson et al. Arch Ophthalmol 1993"]
+        },
+        {
+          "name": "Optogenetic therapy",
+          "type": "optogenetic",
+          "status": "phase_1_2",
+          "mechanism": "Light-sensitive proteins expressed in surviving inner retinal neurons bypass photoreceptors",
+          "eligible_genotype": "genotype-independent (advanced disease)",
+          "erg_effect": "Does not restore conventional ERG; creates novel light responses",
+          "references": ["Sahel et al. Nat Med 2021 (GenSight)"]
+        }
+      ],
+
+      "fundus_features": ["bone_spicule_pigment", "attenuated_vessels", "waxy_disc_pallor", "CME", "epiretinal_membrane"],
+      "oct_features": ["ez_band_disruption", "outer_retinal_thinning", "CME", "epiretinal_membrane"],
+      "key_references": ["Hartong et al. Lancet 2006", "Berson et al. 1993", "Robson & Frishman 2014"]
+    },
+
+    {
+      "id": "csnb_complete",
+      "name": "Congenital Stationary Night Blindness — Complete (Type 1, Schubert-Bornschein)",
+      "category": "inherited_retinal_dystrophy",
+      "subcategory": "stationary_night_blindness",
+      "inheritance": ["x_linked", "autosomal_recessive"],
+      "prevalence": "1:40000",
+      "onset": "congenital",
+      "genes": ["NYX", "GRM6", "TRPM1", "GPR179", "LRIT3"],
+      "progression": "stationary",
+
+      "cell_effects": [
+        {
+          "cell_type": "on_bc",
+          "effect": "signaling_defect",
+          "mechanism": "Disrupted ON-bipolar signal transduction (mGluR6/TRPM1 cascade defective); photoreceptors structurally normal",
+          "temporal_course": "congenital",
+          "severity": "severe"
+        }
+      ],
+
+      "erg_signature": {
+        "scotopic": {
+          "a_wave": { "amplitude": "normal", "implicit_time": "normal", "note": "Photoreceptors are intact" },
+          "b_wave": { "amplitude": "severely_reduced_or_absent", "implicit_time": "normal_when_present", "note": "ELECTRONEGATIVE: a-wave > b-wave" },
+          "ops": { "amplitude": "absent" }
+        },
+        "photopic": {
+          "a_wave": { "amplitude": "normal" },
+          "b_wave": { "amplitude": "reduced", "note": "Broad, reduced waveform" },
+          "flicker_30hz": { "amplitude": "reduced", "implicit_time": "normal", "note": "Normal implicit time distinguishes from RP" }
+        },
+        "diagnostic_pattern": "ELECTRONEGATIVE ERG: preserved a-wave with severely attenuated b-wave. This is the cardinal sign. Normal implicit times distinguish CSNB from progressive RP.",
+        "electronegative": true,
+        "progression_markers": []
+      },
+
+      "model_parameter_changes": [
+        { "param": "g_TRPM1", "direction": "decrease_to_zero", "magnitude": "0-0.1x", "stage": "congenital", "note": "TRPM1 channel completely non-functional in complete CSNB" },
+        { "param": "τ_mGluR6", "direction": "increase_to_infinity", "magnitude": "effectively infinite (no signal transduction)", "stage": "congenital" },
+        { "param": "w_on", "direction": "near_zero", "magnitude": "~0", "stage": "congenital", "note": "ON pathway contributes nothing; b-wave absent" }
+      ],
+
+      "staging": [
+        {
+          "stage": "stable",
+          "clinical": "Night blindness from birth, reduced visual acuity, myopia, nystagmus possible",
+          "erg": "Electronegative ERG: normal a-wave, absent/severely reduced b-wave",
+          "oct": "Normal retinal structure",
+          "model_state": "g_TRPM1 ≈ 0, all photoreceptor params normal"
+        }
+      ],
+
+      "treatments": [
+        {
+          "name": "Gene therapy for CSNB (preclinical)",
+          "type": "gene_therapy",
+          "target_gene": "NYX, TRPM1, GRM6",
+          "status": "preclinical",
+          "mechanism": "Restore ON-bipolar signaling; demonstrated in mouse models",
+          "references": ["Scalabrino et al. 2015", "Dry et al. 2019"]
+        }
+      ],
+
+      "fundus_features": ["normal_or_myopic_fundus"],
+      "oct_features": ["normal_retinal_layers"],
+      "differential_diagnosis": ["incomplete_csnb", "x_linked_retinoschisis", "melanoma_associated_retinopathy"],
+      "key_references": ["Zeitz et al. Prog Retin Eye Res 2015", "Miyake et al. 1986"]
+    },
+
+    {
+      "id": "csnb_incomplete",
+      "name": "Congenital Stationary Night Blindness — Incomplete (Type 2)",
+      "category": "inherited_retinal_dystrophy",
+      "subcategory": "stationary_night_blindness",
+      "inheritance": ["x_linked", "autosomal_recessive"],
+      "prevalence": "1:40000",
+      "onset": "congenital",
+      "genes": ["CACNA1F", "CABP4", "CACNA2D4"],
+      "progression": "stationary",
+
+      "cell_effects": [
+        {
+          "cell_type": "rod",
+          "effect": "synaptic_dysfunction",
+          "mechanism": "Defective Ca2+ channel at photoreceptor synapse; phototransduction intact but synaptic release impaired",
+          "temporal_course": "congenital",
+          "severity": "moderate"
+        },
+        {
+          "cell_type": "cone",
+          "effect": "synaptic_dysfunction",
+          "mechanism": "Same Ca2+ channel defect affects cone synaptic transmission",
+          "temporal_course": "congenital",
+          "severity": "moderate"
+        }
+      ],
+
+      "erg_signature": {
+        "scotopic": {
+          "a_wave": { "amplitude": "normal_to_mildly_reduced" },
+          "b_wave": { "amplitude": "reduced", "note": "Electronegative but less severe than complete CSNB; residual b-wave present" },
+          "ops": { "amplitude": "reduced" }
+        },
+        "photopic": {
+          "a_wave": { "amplitude": "normal_to_mildly_reduced" },
+          "b_wave": { "amplitude": "mildly_reduced" },
+          "flicker_30hz": { "amplitude": "reduced_with_bifurcated_trough", "implicit_time": "normal" }
+        },
+        "diagnostic_pattern": "Electronegative ERG with residual b-wave and characteristic broadened/bifurcated 30Hz flicker trough. Less severe than complete CSNB.",
+        "electronegative": true
+      },
+
+      "model_parameter_changes": [
+        { "param": "g_CNG_rod", "direction": "normal", "note": "Phototransduction intact" },
+        { "param": "τ_Glu_on", "direction": "increase", "magnitude": "3-5x", "note": "Impaired Ca-dependent glutamate release" },
+        { "param": "g_TRPM1", "direction": "decrease", "magnitude": "0.3-0.5x", "note": "Reduced but not absent ON-pathway drive" }
+      ],
+
+      "treatments": [],
+      "key_references": ["Zeitz et al. 2015", "Miyake et al. 1986"]
+    },
+
+    {
+      "id": "lca",
+      "name": "Leber Congenital Amaurosis",
+      "category": "inherited_retinal_dystrophy",
+      "subcategory": "early_onset_severe_retinal_dystrophy",
+      "inheritance": ["autosomal_recessive", "autosomal_dominant_rare"],
+      "prevalence": "1:30000-1:80000",
+      "onset": "birth to first year",
+      "genes": ["RPE65", "CEP290", "GUCY2D", "CRX", "CRB1", "AIPL1", "RPGRIP1", "LCA5", "NMNAT1", "RDH12", "TULP1", "IQCB1", "KCNJ13", "IMPDH1"],
+      "progression": "severe_from_onset_variable_progression",
+
+      "cell_effects": [
+        {
+          "cell_type": "rod",
+          "effect": "severe_dysfunction_or_degeneration",
+          "mechanism": "Gene-dependent: RPE65 → visual cycle block; GUCY2D → cGMP synthesis failure; AIPL1 → PDE instability; CRB1 → photoreceptor structural defect",
+          "temporal_course": "congenital",
+          "severity": "severe"
+        },
+        {
+          "cell_type": "cone",
+          "effect": "severe_dysfunction_or_degeneration",
+          "mechanism": "Most LCA subtypes affect both rod and cone pathways from birth",
+          "temporal_course": "congenital",
+          "severity": "severe"
+        },
+        {
+          "cell_type": "rpe",
+          "effect": "dysfunction_gene_dependent",
+          "mechanism": "RPE65-LCA: visual cycle enzyme absent in RPE; all-trans retinal cannot be recycled",
+          "temporal_course": "congenital",
+          "severity": "severe_for_RPE65_subtype"
+        }
+      ],
+
+      "erg_signature": {
+        "scotopic": {
+          "a_wave": { "amplitude": "absent_or_profoundly_reduced" },
+          "b_wave": { "amplitude": "absent_or_profoundly_reduced" },
+          "ops": { "amplitude": "absent" }
+        },
+        "photopic": {
+          "a_wave": { "amplitude": "absent_or_profoundly_reduced" },
+          "b_wave": { "amplitude": "absent_or_profoundly_reduced" },
+          "flicker_30hz": { "amplitude": "absent_or_profoundly_reduced" }
+        },
+        "diagnostic_pattern": "Severely abnormal or extinguished ERG from birth/early infancy. This is the defining electrophysiological feature. Some genotypes (e.g., CEP290) may have residual cone-mediated responses.",
+        "electronegative": false
+      },
+
+      "model_parameter_changes": [
+        { "param": "N_rod", "direction": "decrease", "magnitude": "0-0.2", "stage": "congenital" },
+        { "param": "N_cone", "direction": "decrease", "magnitude": "0-0.3", "stage": "congenital" },
+        { "param": "η_rod", "direction": "decrease_to_zero", "note": "For RPE65: quantum efficiency effectively zero without 11-cis retinal" },
+        { "param": "α_G", "direction": "decrease_to_zero", "note": "For GUCY2D: no cGMP synthesis" }
+      ],
+
+      "treatments": [
+        {
+          "name": "Voretigene neparvovec (Luxturna)",
+          "type": "gene_therapy",
+          "target_gene": "RPE65",
+          "status": "FDA_approved_2017",
+          "mechanism": "AAV2-delivered RPE65 restores visual cycle; subretinal injection",
+          "eligible_genotype": "biallelic RPE65 (LCA type 2)",
+          "erg_effect": "Improved light sensitivity (FST); variable ERG amplitude recovery; pupillometry improvement",
+          "references": ["Russell et al. Lancet 2017"]
+        },
+        {
+          "name": "EDIT-101 (CEP290 gene editing)",
+          "type": "gene_editing",
+          "target_gene": "CEP290",
+          "status": "phase_1_2",
+          "mechanism": "CRISPR/Cas9 to remove intronic splice mutation IVS26 in CEP290",
+          "eligible_genotype": "CEP290 IVS26 mutation (LCA type 10)",
+          "references": ["Editas Medicine / Allergan"]
+        },
+        {
+          "name": "OPGx-LCA5 (Opus Genetics)",
+          "type": "gene_therapy",
+          "target_gene": "LCA5",
+          "status": "phase_1_2",
+          "mechanism": "AAV8-delivered LCA5 gene to outer retina",
+          "eligible_genotype": "biallelic LCA5 mutations (LCA type 5)"
+        },
+        {
+          "name": "AIPL1 gene therapy",
+          "type": "gene_therapy",
+          "target_gene": "AIPL1",
+          "status": "phase_1",
+          "mechanism": "AAV-delivered AIPL1; first-in-human 2025 (Michaelides et al. Lancet 2025)",
+          "eligible_genotype": "biallelic AIPL1 mutations"
+        }
+      ],
+
+      "key_references": ["den Hollander et al. Prog Retin Eye Res 2008", "Kumaran et al. Br J Ophthalmol 2017"]
+    },
+
+    {
+      "id": "stargardt",
+      "name": "Stargardt Disease (Fundus Flavimaculatus)",
+      "category": "inherited_retinal_dystrophy",
+      "subcategory": "macular_dystrophy",
+      "inheritance": ["autosomal_recessive", "autosomal_dominant_rare"],
+      "prevalence": "1:8000-1:10000",
+      "onset": "childhood to young adult",
+      "genes": ["ABCA4", "ELOVL4", "PROM1"],
+      "progression": "progressive",
+
+      "cell_effects": [
+        {
+          "cell_type": "rpe",
+          "effect": "lipofuscin_accumulation",
+          "mechanism": "ABCA4 dysfunction → A2E (bisretinoid) accumulates in RPE → phototoxicity → RPE cell death",
+          "temporal_course": "early",
+          "severity": "severe_in_macula"
+        },
+        {
+          "cell_type": "cone",
+          "effect": "secondary_degeneration",
+          "mechanism": "RPE death leads to photoreceptor loss; preferentially macular cones",
+          "temporal_course": "mid",
+          "severity": "severe_centrally"
+        },
+        {
+          "cell_type": "rod",
+          "effect": "secondary_degeneration",
+          "mechanism": "Peripheral rods affected in advanced disease (Lois Group 3)",
+          "temporal_course": "late",
+          "severity": "variable"
+        }
+      ],
+
+      "erg_signature": {
+        "scotopic": {
+          "a_wave": { "amplitude": "normal_early_reduced_late", "note": "Depends on Lois classification group" },
+          "b_wave": { "amplitude": "normal_early_reduced_late" }
+        },
+        "photopic": {
+          "a_wave": { "amplitude": "normal_to_reduced" },
+          "b_wave": { "amplitude": "normal_to_reduced" },
+          "flicker_30hz": { "amplitude": "normal_to_reduced", "note": "Reduced in Lois Group 2 and 3" }
+        },
+        "pattern_erg": { "P50": "reduced", "note": "PERG is the most sensitive ERG measure; reduced P50 indicates macular dysfunction" },
+        "multifocal_erg": { "central_rings": "reduced", "note": "mfERG shows central depression corresponding to macular lesion" },
+        "diagnostic_pattern": "Full-field ERG may be NORMAL early (Lois Group 1: macular dysfunction only). PERG and mfERG show macular deficit. Groups 2/3 show generalized cone or rod-cone dysfunction on ffERG. EOG is abnormal (suppressed Arden ratio).",
+        "electronegative": false,
+        "lois_groups": {
+          "group_1": "Macular dysfunction only; normal ffERG, abnormal PERG/mfERG",
+          "group_2": "Generalized cone dysfunction + macular; reduced photopic ffERG",
+          "group_3": "Generalized cone AND rod dysfunction; reduced scotopic and photopic ffERG"
+        }
+      },
+
+      "model_parameter_changes": [
+        { "param": "N_cone", "direction": "decrease", "magnitude": "0.3-0.8 (central weighted)", "stage": "mid" },
+        { "param": "τ_RPE", "direction": "increase", "magnitude": "2-5x", "note": "RPE dysfunction slows visual cycle" },
+        { "param": "α_K_RPE", "direction": "decrease", "magnitude": "0.3-0.7x", "note": "RPE K+ transport impaired" },
+        { "param": "N_rod", "direction": "decrease", "magnitude": "0.5-0.9 (Group 3 only)", "stage": "late" }
+      ],
+
+      "treatments": [
+        {
+          "name": "SB-007 (dual-vector ABCA4)",
+          "type": "gene_therapy",
+          "target_gene": "ABCA4",
+          "status": "IND_approved_2024",
+          "mechanism": "Dual AAV8 split-intein vectors reconstitute full-length ABCA4 (gene too large for single AAV)",
+          "references": ["SpliceBio"]
+        },
+        {
+          "name": "Complement factor inhibition",
+          "type": "pharmacological",
+          "status": "phase_2",
+          "mechanism": "Reduce complement-mediated RPE/photoreceptor damage"
+        },
+        {
+          "name": "Visual cycle modulators (emixustat, ALK-001)",
+          "type": "pharmacological",
+          "status": "phase_2_3",
+          "mechanism": "Slow A2E accumulation by reducing visual cycle flux"
+        }
+      ],
+
+      "fundus_features": ["central_beaten_bronze_macular_atrophy", "yellow_white_flecks", "dark_choroid_on_FA"],
+      "key_references": ["Allikmets et al. Science 1997", "Lois et al. IOVS 2001"]
+    },
+
+    {
+      "id": "best_disease",
+      "name": "Best Vitelliform Macular Dystrophy",
+      "category": "inherited_retinal_dystrophy",
+      "subcategory": "macular_dystrophy",
+      "inheritance": ["autosomal_dominant"],
+      "prevalence": "1:10000",
+      "onset": "childhood",
+      "genes": ["BEST1"],
+      "progression": "slowly_progressive",
+
+      "cell_effects": [
+        {
+          "cell_type": "rpe",
+          "effect": "chloride_channel_dysfunction",
+          "mechanism": "BEST1 (bestrophin-1) encodes a Ca-activated Cl channel in RPE; dysfunction leads to abnormal fluid/ion transport and lipofuscin accumulation between RPE and photoreceptors",
+          "temporal_course": "early",
+          "severity": "moderate"
+        },
+        {
+          "cell_type": "cone",
+          "effect": "secondary_dysfunction",
+          "mechanism": "Subretinal vitelliform material disrupts photoreceptor-RPE interface",
+          "temporal_course": "mid",
+          "severity": "moderate_centrally"
+        }
+      ],
+
+      "erg_signature": {
+        "scotopic": {
+          "a_wave": { "amplitude": "normal" },
+          "b_wave": { "amplitude": "normal" }
+        },
+        "photopic": {
+          "a_wave": { "amplitude": "normal" },
+          "b_wave": { "amplitude": "normal" }
+        },
+        "eog": { "arden_ratio": "severely_reduced_below_1.5", "note": "EOG is the KEY diagnostic test. Abnormal EOG with normal ffERG is pathognomonic for Best disease." },
+        "diagnostic_pattern": "NORMAL full-field ERG with ABNORMAL EOG (Arden ratio < 1.5). This combination is virtually diagnostic. Pattern ERG may be reduced if macular lesion is large.",
+        "electronegative": false
+      },
+
+      "model_parameter_changes": [
+        { "param": "g_K_apical", "direction": "altered", "note": "Bestrophin-1 is a Cl channel, not directly in current K-based RPE model; would need Cl conductance addition" },
+        { "param": "τ_RPE", "direction": "increase", "magnitude": "2-4x", "note": "RPE ionic transport impaired" },
+        { "param": "c_wave_amplitude", "direction": "reduced", "note": "c-wave depends on RPE function; reduced in Best" }
+      ],
+
+      "treatments": [],
+      "fundus_features": ["egg_yolk_vitelliform_lesion", "pseudohypopyon", "scrambled_egg_stage", "atrophic_stage"],
+      "key_references": ["Marmorstein et al. 2000", "Boon et al. Prog Retin Eye Res 2009"]
+    },
+
+    {
+      "id": "xlrs",
+      "name": "X-Linked Juvenile Retinoschisis",
+      "category": "inherited_retinal_dystrophy",
+      "subcategory": "vitreoretinal_dystrophy",
+      "inheritance": ["x_linked"],
+      "prevalence": "1:5000-1:25000 males",
+      "onset": "childhood",
+      "genes": ["RS1"],
+      "progression": "slowly_progressive",
+
+      "cell_effects": [
+        {
+          "cell_type": "on_bc",
+          "effect": "structural_disruption",
+          "mechanism": "Retinoschisin (RS1) is a cell adhesion protein; its absence causes splitting at inner nuclear layer, disrupting bipolar cell signaling",
+          "temporal_course": "congenital",
+          "severity": "moderate_to_severe"
+        },
+        {
+          "cell_type": "muller",
+          "effect": "structural_disruption",
+          "mechanism": "Schisis cavities disrupt Müller cell processes spanning retinal layers",
+          "temporal_course": "congenital",
+          "severity": "moderate"
+        }
+      ],
+
+      "erg_signature": {
+        "scotopic": {
+          "a_wave": { "amplitude": "normal", "note": "Photoreceptors intact" },
+          "b_wave": { "amplitude": "severely_reduced", "note": "ELECTRONEGATIVE: a > b" }
+        },
+        "photopic": {
+          "b_wave": { "amplitude": "reduced" }
+        },
+        "diagnostic_pattern": "ELECTRONEGATIVE ERG similar to complete CSNB. Key differential: XLRS has foveal schisis on OCT, spoke-wheel macular pattern. Inner retinal splitting at INL level.",
+        "electronegative": true
+      },
+
+      "model_parameter_changes": [
+        { "param": "w_on", "direction": "decrease", "magnitude": "0.2-0.5x", "note": "Disrupted bipolar cell signal transmission through schisis" },
+        { "param": "w_muller", "direction": "decrease", "magnitude": "0.3-0.6x", "note": "Müller cell K+ buffering disrupted" }
+      ],
+
+      "treatments": [
+        {
+          "name": "RS1 gene therapy (multiple trials)",
+          "type": "gene_therapy",
+          "target_gene": "RS1",
+          "status": "phase_1_2",
+          "mechanism": "Intravitreal AAV-delivered RS1; aim to restore cell adhesion and close schisis cavities",
+          "references": ["Cukras et al. 2018"]
+        }
+      ],
+
+      "key_references": ["Sauer et al. Prog Retin Eye Res 2012"]
+    },
+
+    {
+      "id": "diabetic_retinopathy",
+      "name": "Diabetic Retinopathy",
+      "category": "vascular",
+      "subcategory": "diabetic_eye_disease",
+      "inheritance": ["non_genetic"],
+      "prevalence": "~30% of diabetics",
+      "onset": "adult (years after diabetes onset)",
+      "genes": [],
+      "risk_factors": ["diabetes_duration", "HbA1c", "hypertension", "hyperlipidemia"],
+      "progression": "progressive",
+
+      "cell_effects": [
+        {
+          "cell_type": "vasculature",
+          "effect": "microangiopathy",
+          "mechanism": "Hyperglycemia → pericyte loss → capillary basement membrane thickening → microaneurysms → capillary non-perfusion → neovascularization",
+          "temporal_course": "progressive",
+          "severity": "progressive"
+        },
+        {
+          "cell_type": "a2",
+          "effect": "neuronal_dysfunction",
+          "mechanism": "Inner retinal neurons affected BEFORE visible vascular lesions; dopaminergic and GABAergic amacrine cells particularly vulnerable to metabolic stress",
+          "temporal_course": "early_preclinical",
+          "severity": "moderate"
+        },
+        {
+          "cell_type": "gaba_ac",
+          "effect": "dysfunction_and_loss",
+          "mechanism": "GABAergic amacrines affected by glutamate excitotoxicity and oxidative stress",
+          "temporal_course": "early",
+          "severity": "moderate"
+        },
+        {
+          "cell_type": "rgc",
+          "effect": "apoptosis",
+          "mechanism": "RGC loss documented even before clinically evident DR; inner retinal thinning on OCT",
+          "temporal_course": "early",
+          "severity": "mild_to_moderate"
+        },
+        {
+          "cell_type": "muller",
+          "effect": "reactive_gliosis_and_dysfunction",
+          "mechanism": "Müller cells become reactive; GFAP upregulation; altered glutamate transport; contribute to BRB breakdown via VEGF release",
+          "temporal_course": "early_to_mid",
+          "severity": "moderate"
+        },
+        {
+          "cell_type": "rod",
+          "effect": "reduced_sensitivity",
+          "mechanism": "Dark adaptation impaired in diabetics even without visible DR; rod sensitivity reduced",
+          "temporal_course": "early_preclinical",
+          "severity": "mild"
+        }
+      ],
+
+      "erg_signature": {
+        "scotopic": {
+          "a_wave": { "amplitude": "normal_to_mildly_reduced", "implicit_time": "mildly_delayed", "note": "a-wave reduction documented in T1D without DR" },
+          "b_wave": { "amplitude": "mildly_reduced", "implicit_time": "delayed" },
+          "ops": { "amplitude": "REDUCED_EARLIEST_SIGN", "implicit_time": "DELAYED_EARLIEST_SIGN", "note": "OP amplitude reduction and implicit time delay are the MOST SENSITIVE ERG indicators of DR, detectable BEFORE clinical retinopathy" }
+        },
+        "photopic": {
+          "b_wave": { "amplitude": "reduced_later", "implicit_time": "delayed" },
+          "flicker_30hz": { "amplitude": "reduced", "implicit_time": "delayed", "note": "Predicts progression to proliferative DR" },
+          "phnr": { "amplitude": "reduced", "note": "Reflects RGC dysfunction; reduced early" }
+        },
+        "diagnostic_pattern": "OPs are the most sensitive indicator — reduced amplitude and delayed implicit time PRECEDE visible vascular lesions. OP changes predict progression to proliferative DR. Rod-derived responses affected before cone responses. PhNR reduction reflects early RGC involvement.",
+        "electronegative": false,
+        "progression_markers": ["OP_sum_amplitude", "OP_implicit_time", "30hz_flicker_implicit_time", "PhNR_amplitude"]
+      },
+
+      "model_parameter_changes": [
+        { "param": "g_Ca_a2", "direction": "decrease", "magnitude": "0.5-0.8x", "stage": "early", "note": "Amacrine dysfunction → OP reduction" },
+        { "param": "g_Ca_gaba", "direction": "decrease", "magnitude": "0.5-0.8x", "stage": "early" },
+        { "param": "τ_Gly", "direction": "increase", "magnitude": "1.5-2x", "stage": "early", "note": "Slowed amacrine kinetics → OP delay" },
+        { "param": "τ_GABA", "direction": "increase", "magnitude": "1.5-2x", "stage": "early" },
+        { "param": "g_Kir_end", "direction": "decrease", "magnitude": "0.6-0.8x", "stage": "mid", "note": "Müller gliosis" },
+        { "param": "g_CNG_rod", "direction": "decrease", "magnitude": "0.8-0.95x", "stage": "early", "note": "Subtle rod sensitivity loss" }
+      ],
+
+      "staging": [
+        {
+          "stage": "preclinical (no visible DR)",
+          "clinical": "No visible fundus changes; diabetes diagnosed",
+          "erg": "OPs reduced and delayed; subtle rod a-wave changes; PhNR may be reduced",
+          "model_state": "Amacrine params mildly shifted; photoreceptor params near normal"
+        },
+        {
+          "stage": "mild NPDR",
+          "clinical": "Microaneurysms only",
+          "erg": "OPs further reduced; rod and cone b-wave reduction beginning",
+          "model_state": "Amacrine + Müller params shifted"
+        },
+        {
+          "stage": "moderate-severe NPDR",
+          "clinical": "Hemorrhages, hard exudates, cotton wool spots, venous beading",
+          "erg": "All scotopic components reduced; 30Hz flicker delayed",
+          "model_state": "Broad parameter shifts across inner retina"
+        },
+        {
+          "stage": "proliferative DR",
+          "clinical": "Neovascularization, vitreous hemorrhage",
+          "erg": "Severely reduced responses; may be unrecordable if media opacity",
+          "model_state": "Severe inner retinal dysfunction"
+        }
+      ],
+
+      "treatments": [
+        { "name": "Anti-VEGF injection (ranibizumab, aflibercept, faricimab)", "type": "pharmacological", "status": "standard_of_care", "mechanism": "Reduce VEGF-driven neovascularization and macular edema" },
+        { "name": "Pan-retinal photocoagulation (PRP)", "type": "laser", "status": "standard_of_care", "mechanism": "Destroy ischemic retina to reduce VEGF drive" },
+        { "name": "Glycemic control", "type": "systemic", "status": "standard_of_care", "mechanism": "HbA1c reduction slows progression (DCCT/UKPDS)" }
+      ],
+
+      "key_references": ["Bresnick & Palta 1987 (OPs in DR)", "Holopigian et al. IOVS 1992", "Bearse et al. IOVS 2006 (mfERG prediction)"]
+    },
+
+    {
+      "id": "crvo",
+      "name": "Central Retinal Vein Occlusion",
+      "category": "vascular",
+      "subcategory": "retinal_vein_occlusion",
+      "inheritance": ["non_genetic"],
+      "prevalence": "0.1-0.4%",
+      "onset": "adult",
+      "progression": "acute_onset_variable_recovery",
+
+      "cell_effects": [
+        {
+          "cell_type": "vasculature",
+          "effect": "venous_obstruction",
+          "mechanism": "Thrombosis at lamina cribrosa → raised venous pressure → hemorrhage → ischemia",
+          "temporal_course": "acute",
+          "severity": "severe"
+        },
+        {
+          "cell_type": "on_bc",
+          "effect": "ischemic_dysfunction",
+          "mechanism": "Inner retinal ischemia from capillary non-perfusion",
+          "temporal_course": "acute",
+          "severity": "variable"
+        }
+      ],
+
+      "erg_signature": {
+        "scotopic": {
+          "a_wave": { "amplitude": "normal_to_reduced", "note": "Depends on ischemia severity; photoreceptors relatively spared (choroidal supply)" },
+          "b_wave": { "amplitude": "reduced", "note": "b:a ratio < 1 in ischemic CRVO (electronegative)" }
+        },
+        "diagnostic_pattern": "b:a ratio on bright flash scotopic ERG predicts ischemic vs. non-ischemic CRVO. b:a < 1 (electronegative) → ischemic, high risk of neovascularization. OPs reduced proportional to ischemia.",
+        "electronegative": "in_ischemic_type",
+        "progression_markers": ["b_a_ratio", "OP_amplitude"]
+      },
+
+      "model_parameter_changes": [
+        { "param": "w_on", "direction": "decrease", "magnitude": "0.3-0.8x", "note": "Inner retinal ischemia" },
+        { "param": "g_Ca_a2", "direction": "decrease", "magnitude": "0.3-0.7x", "note": "Amacrine ischemia → OP loss" }
+      ],
+
+      "treatments": [
+        { "name": "Anti-VEGF injection", "type": "pharmacological", "status": "standard_of_care" },
+        { "name": "Intravitreal dexamethasone implant (Ozurdex)", "type": "pharmacological", "status": "standard_of_care" }
+      ],
+
+      "key_references": ["Kuo et al. 2020", "Matsui et al. Jpn J Ophthalmol 1994"]
+    },
+
+    {
+      "id": "amd_dry",
+      "name": "Age-Related Macular Degeneration — Dry (Atrophic)",
+      "category": "age_related",
+      "subcategory": "macular_degeneration",
+      "inheritance": ["complex_multifactorial"],
+      "prevalence": "~10% over age 65",
+      "onset": ">50 years",
+      "genes": ["CFH", "ARMS2", "HTRA1", "C3", "C2", "CFB"],
+      "risk_factors": ["age", "smoking", "family_history", "CFH_polymorphism"],
+      "progression": "slowly_progressive",
+
+      "cell_effects": [
+        {
+          "cell_type": "rpe",
+          "effect": "drusen_accumulation_and_atrophy",
+          "mechanism": "Drusen (lipid/protein deposits) form between RPE and Bruch's membrane → complement activation → RPE degeneration → geographic atrophy",
+          "temporal_course": "progressive",
+          "severity": "moderate_to_severe"
+        },
+        {
+          "cell_type": "cone",
+          "effect": "secondary_degeneration",
+          "mechanism": "RPE atrophy leads to photoreceptor loss in areas of geographic atrophy; preferentially macular",
+          "temporal_course": "mid_to_late",
+          "severity": "severe_centrally"
+        },
+        {
+          "cell_type": "rod",
+          "effect": "early_dysfunction",
+          "mechanism": "Rod function in macula impaired even before drusen visible; dark adaptation delay is earliest functional sign of AMD",
+          "temporal_course": "early",
+          "severity": "mild_to_moderate"
+        }
+      ],
+
+      "erg_signature": {
+        "scotopic": {
+          "a_wave": { "amplitude": "normal_to_mildly_reduced", "note": "ffERG may be normal because macular area is small relative to total retina" },
+          "b_wave": { "amplitude": "normal_to_mildly_reduced" }
+        },
+        "photopic": {
+          "a_wave": { "amplitude": "normal_to_reduced_in_advanced" },
+          "b_wave": { "amplitude": "normal_to_reduced_in_advanced" }
+        },
+        "pattern_erg": { "P50": "reduced", "note": "Most sensitive ERG measure for macular dysfunction in AMD" },
+        "multifocal_erg": { "central_rings": "delayed_and_reduced", "note": "mfERG implicit time delays in early AMD predict progression to advanced disease" },
+        "diagnostic_pattern": "Full-field ERG is often NORMAL in early-moderate AMD (macular lesion too small). PERG and mfERG are key: mfERG implicit time delays in perilesional zones predict GA expansion. Dark adaptation testing (non-ERG) is the earliest functional biomarker.",
+        "electronegative": false
+      },
+
+      "model_parameter_changes": [
+        { "param": "τ_RPE", "direction": "increase", "magnitude": "2-5x", "note": "RPE dysfunction in drusen areas" },
+        { "param": "N_cone", "direction": "decrease", "magnitude": "0.5-0.9 (weighted centrally)", "stage": "mid_to_late" },
+        { "param": "η_rod", "direction": "decrease", "magnitude": "0.7-0.9x", "stage": "early", "note": "Dark adaptation impairment" }
+      ],
+
+      "treatments": [
+        { "name": "Pegcetacoplan (Syfovre)", "type": "pharmacological", "status": "FDA_approved_2023", "mechanism": "Complement C3 inhibitor; slows geographic atrophy growth by ~20%" },
+        { "name": "Avacincaptad pegol (Izervay)", "type": "pharmacological", "status": "FDA_approved_2023", "mechanism": "Complement C5 inhibitor; slows GA growth" },
+        { "name": "AREDS2 supplementation", "type": "nutritional", "status": "standard_of_care", "mechanism": "Antioxidant vitamins + lutein/zeaxanthin reduce risk of progression to advanced AMD" }
+      ],
+
+      "key_references": ["Owsley et al. 2016 (dark adaptation)", "Hood et al. (mfERG in AMD)", "Fleckenstein et al. Ophthalmology 2018"]
+    },
+
+    {
+      "id": "esc_syndrome",
+      "name": "Enhanced S-Cone Syndrome",
+      "category": "inherited_retinal_dystrophy",
+      "subcategory": "cone_dysfunction",
+      "inheritance": ["autosomal_recessive"],
+      "prevalence": "rare",
+      "onset": "childhood",
+      "genes": ["NR2E3"],
+      "progression": "slowly_progressive",
+
+      "cell_effects": [
+        {
+          "cell_type": "rod",
+          "effect": "developmental_absence",
+          "mechanism": "NR2E3 mutation → photoreceptor precursors fail to differentiate into rods; instead become S-cone-like cells",
+          "temporal_course": "congenital",
+          "severity": "severe"
+        },
+        {
+          "cell_type": "cone",
+          "effect": "excess_s_cones",
+          "mechanism": "Excess S-cones replace rods; L/M cones may be reduced",
+          "temporal_course": "congenital",
+          "severity": "abnormal_distribution"
+        }
+      ],
+
+      "erg_signature": {
+        "scotopic": {
+          "a_wave": { "amplitude": "reduced" },
+          "b_wave": { "amplitude": "increased_slow_waveform", "note": "PATHOGNOMONIC: delayed, increased b-wave amplitude at low scotopic intensities due to S-cone hypersensitivity" }
+        },
+        "photopic": {
+          "flicker_30hz": { "amplitude": "reduced" },
+          "s_cone_erg": { "amplitude": "grossly_enhanced", "note": "S-cone ERG is massively supranormal — pathognomonic" }
+        },
+        "diagnostic_pattern": "PATHOGNOMONIC: Supranormal S-cone ERG response with absent rod response and delayed/enhanced scotopic waveform. One of the few diseases diagnosed solely on ERG pattern.",
+        "electronegative": false
+      },
+
+      "model_parameter_changes": [
+        { "param": "N_rod", "direction": "decrease_to_zero", "note": "No functional rods" },
+        { "param": "N_cone", "direction": "altered_distribution", "note": "Would need cone subtype model (S vs L/M) not in current spec" }
+      ],
+
+      "treatments": [],
+      "key_references": ["Jacobson et al. IOVS 1990", "Haider et al. Nat Genet 2000"]
+    },
+
+    {
+      "id": "achromatopsia",
+      "name": "Achromatopsia (Rod Monochromacy)",
+      "category": "inherited_retinal_dystrophy",
+      "subcategory": "cone_dysfunction",
+      "inheritance": ["autosomal_recessive"],
+      "prevalence": "1:30000-1:50000",
+      "onset": "congenital",
+      "genes": ["CNGA3", "CNGB3", "GNAT2", "PDE6C", "PDE6H", "ATF6"],
+      "progression": "stationary_or_slowly_progressive",
+
+      "cell_effects": [
+        {
+          "cell_type": "cone",
+          "effect": "complete_dysfunction",
+          "mechanism": "Cone phototransduction cascade non-functional; gene-dependent (CNG channel or transducin/PDE defects)",
+          "temporal_course": "congenital",
+          "severity": "severe"
+        }
+      ],
+
+      "erg_signature": {
+        "scotopic": {
+          "a_wave": { "amplitude": "normal" },
+          "b_wave": { "amplitude": "normal" },
+          "note": "Rod pathway completely normal"
+        },
+        "photopic": {
+          "a_wave": { "amplitude": "absent" },
+          "b_wave": { "amplitude": "absent" },
+          "flicker_30hz": { "amplitude": "absent", "note": "No cone-mediated response at all" }
+        },
+        "diagnostic_pattern": "Normal scotopic ERG with ABSENT photopic and 30Hz flicker responses. This pattern is diagnostic. Distinguishes from incomplete achromatopsia (reduced but present cone responses) and blue cone monochromatism (S-cone signal detectable with blue-on-yellow).",
+        "electronegative": false
+      },
+
+      "model_parameter_changes": [
+        { "param": "g_CNG_cone", "direction": "decrease_to_zero", "note": "For CNGA3/CNGB3: CNG channels non-functional" },
+        { "param": "γ_cone", "direction": "decrease_to_zero", "note": "For GNAT2/PDE6C: cone transduction cascade broken" }
+      ],
+
+      "treatments": [
+        {
+          "name": "CNGA3 gene therapy",
+          "type": "gene_therapy",
+          "target_gene": "CNGA3",
+          "status": "phase_1_2",
+          "mechanism": "AAV-delivered CNGA3 to restore cone CNG channel function",
+          "references": ["Fischer et al. JAMA Ophthalmol 2020"]
+        },
+        {
+          "name": "CNGB3 gene therapy",
+          "type": "gene_therapy",
+          "target_gene": "CNGB3",
+          "status": "phase_1_2",
+          "mechanism": "AAV-delivered CNGB3",
+          "references": ["AGTC/Applied Genetic Technologies"]
+        }
+      ],
+
+      "key_references": ["Kohl et al. Hum Mol Genet 1998", "Michaelides et al. Ophthalmology 2004"]
+    },
+
+    {
+      "id": "rop",
+      "name": "Retinopathy of Prematurity",
+      "category": "pediatric_developmental",
+      "subcategory": "vascular_developmental",
+      "inheritance": ["non_genetic"],
+      "prevalence": "~15% of premature infants (<1500g)",
+      "onset": "neonatal (28-40 weeks postmenstrual age)",
+      "risk_factors": ["prematurity", "low_birth_weight", "supplemental_oxygen", "sepsis"],
+      "progression": "variable_may_regress_or_progress",
+
+      "cell_effects": [
+        {
+          "cell_type": "vasculature",
+          "effect": "incomplete_vascularization_then_neovascularization",
+          "mechanism": "Premature retina is avascular peripherally; hyperoxia → VEGF suppression → vascular growth arrest; then relative hypoxia → VEGF surge → abnormal neovascularization",
+          "temporal_course": "neonatal_acute",
+          "severity": "variable_stage_dependent"
+        },
+        {
+          "cell_type": "rod",
+          "effect": "developmental_delay",
+          "mechanism": "Rod photoreceptor maturation delayed in premature infants; may have long-term subtle deficits",
+          "temporal_course": "developmental",
+          "severity": "mild_to_moderate"
+        },
+        {
+          "cell_type": "on_bc",
+          "effect": "inner_retinal_dysfunction",
+          "mechanism": "Vascular insufficiency affects inner retinal development",
+          "temporal_course": "developmental",
+          "severity": "mild"
+        }
+      ],
+
+      "erg_signature": {
+        "scotopic": {
+          "a_wave": { "amplitude": "reduced", "note": "Even in premature infants without ROP, rod ERG is immature" },
+          "b_wave": { "amplitude": "reduced" },
+          "ops": { "amplitude": "reduced", "note": "OPs are particularly reduced in ROP; may predict severity" }
+        },
+        "photopic": {
+          "b_wave": { "amplitude": "reduced_in_severe_ROP" },
+          "flicker_30hz": { "amplitude": "reduced_in_severe_ROP" }
+        },
+        "diagnostic_pattern": "ERG shows maturational delay compared to term infants. In treated/regressed ROP, long-term ERG deficits persist: reduced scotopic responses, reduced OPs, suggesting lasting inner retinal dysfunction. Severity of ERG changes correlates with ROP stage.",
+        "electronegative": false
+      },
+
+      "model_parameter_changes": [
+        { "param": "N_rod", "direction": "mildly_reduced", "magnitude": "0.7-0.9", "note": "Immature rod population" },
+        { "param": "g_Ca_a2", "direction": "decrease", "magnitude": "0.6-0.8x", "note": "Inner retinal immaturity/ischemia" }
+      ],
+
+      "treatments": [
+        { "name": "Anti-VEGF injection (ranibizumab)", "type": "pharmacological", "status": "standard_of_care_for_severe", "mechanism": "Reduce pathologic neovascularization" },
+        { "name": "Laser photocoagulation", "type": "laser", "status": "standard_of_care", "mechanism": "Ablate avascular peripheral retina" },
+        { "name": "Careful oxygen management", "type": "systemic", "status": "prevention", "mechanism": "Titrate supplemental O2 to minimize hyperoxia-hypoxia swings" }
+      ],
+
+      "key_references": ["Fulton et al. Doc Ophthalmol 2009", "Bowman et al. Eye 2018"]
+    }
+  ],
+
+  "differential_diagnosis_rules": [
+    {
+      "pattern": "electronegative_erg",
+      "description": "Normal a-wave with severely reduced b-wave (b:a ratio < 1)",
+      "differential": [
+        { "disease": "csnb_complete", "distinguishing": "Congenital, stationary, normal implicit times" },
+        { "disease": "csnb_incomplete", "distinguishing": "Less severe, bifurcated 30Hz flicker" },
+        { "disease": "xlrs", "distinguishing": "Males, foveal schisis on OCT, spoke-wheel macula" },
+        { "disease": "crvo", "distinguishing": "Acute onset, hemorrhages, unilateral" },
+        { "disease": "melanoma_associated_retinopathy", "distinguishing": "History of cutaneous melanoma, autoantibodies" },
+        { "disease": "congenital_retinoschisis", "distinguishing": "Males, RS1 mutation" }
+      ]
+    },
+    {
+      "pattern": "extinguished_erg",
+      "description": "No recordable scotopic or photopic responses",
+      "differential": [
+        { "disease": "lca", "distinguishing": "Infancy onset, nystagmus, oculodigital sign" },
+        { "disease": "rp_rod_cone", "distinguishing": "Advanced stage, bone spicules, progressive history" },
+        { "disease": "cancer_associated_retinopathy", "distinguishing": "Acute/subacute onset in adult, anti-recoverin antibodies" }
+      ]
+    },
+    {
+      "pattern": "ops_selectively_reduced",
+      "description": "OPs reduced or delayed with relatively preserved a-wave and b-wave",
+      "differential": [
+        { "disease": "diabetic_retinopathy", "distinguishing": "Diabetes history, may precede visible lesions" },
+        { "disease": "crvo", "distinguishing": "Acute onset, hemorrhages" },
+        { "disease": "sickle_cell_retinopathy", "distinguishing": "Sickle cell disease" }
+      ]
+    },
+    {
+      "pattern": "normal_fferg_abnormal_eog",
+      "description": "Full-field ERG normal but EOG Arden ratio reduced",
+      "differential": [
+        { "disease": "best_disease", "distinguishing": "Vitelliform macular lesion, BEST1 mutation" },
+        { "disease": "stargardt", "distinguishing": "Flecks, dark choroid on FA, ABCA4 mutation (some variants)" },
+        { "disease": "pattern_dystrophy", "distinguishing": "Butterfly-shaped or reticular macular pattern" }
+      ]
+    },
+    {
+      "pattern": "supranormal_scotopic_b_wave",
+      "description": "Enhanced/delayed scotopic b-wave with absent or supranormal S-cone response",
+      "differential": [
+        { "disease": "esc_syndrome", "distinguishing": "Supranormal S-cone ERG; NR2E3 mutation" }
+      ]
+    }
+  ]
+}
