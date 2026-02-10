@@ -7,6 +7,7 @@ using Statistics
 include("types.jl")
 
 # --- Default parameters ---
+include("parameters/parameter_extraction.jl")
 include("parameters.jl")
 
 # --- Stimulus ---
@@ -56,11 +57,15 @@ export
     ERGWeights, StimulusProtocol, PopulationSizes,
     RetinalColumn, StateIndex, ConnectionDef,
     # State layout constants
-    ROD_STATE_VARS, CONE_STATE_VARS,
-    ROD_V_INDEX, ROD_GLU_INDEX, CONE_V_INDEX, CONE_GLU_INDEX,
+    ROD_STATE_VARS,
+    ROD_R_INDEX, ROD_T_INDEX, ROD_P_INDEX, ROD_G_INDEX,
+    ROD_HC1_INDEX, ROD_HC2_INDEX, ROD_HO1_INDEX, ROD_HO2_INDEX, ROD_HO3_INDEX,
+    ROD_MKV_INDEX, ROD_HKV_INDEX, ROD_MCA_INDEX, ROD_MKCA_INDEX,
+    ROD_CA_S_INDEX, ROD_CA_F_INDEX, ROD_CAB_LS_INDEX, ROD_CAB_HS_INDEX,
+    ROD_CAB_LF_INDEX, ROD_CAB_HF_INDEX, ROD_V_INDEX,
     # Parameter factories
     build_retinal_column,
-    default_rod_params, default_cone_params,
+    default_rod_params,
     default_hc_params, default_on_bc_params, default_off_bc_params,
     default_a2_params, default_gaba_params, default_da_params, default_gc_params,
     default_muller_params, default_rpe_params, default_mglur6_params,
@@ -71,9 +76,7 @@ export
     simulate_flash, extract_voltages, extract_neurotransmitters,
     dark_adapted_state, retinal_column_rhs!, zipper_rhs!,
     # Photoreceptor models and initial conditions
-    # Photoreceptor models and initial conditions
-    rod_dark_state, cone_dark_state,
-    photoreceptor_model!, photoreceptor_model_with_stim!,
+    rod_dark_state, rod_model!,
     # Cell-level RHS functions
     rod_cell_rhs!, cone_cell_rhs!,
     horizontal_cell_rhs!, on_bipolar_cell_rhs!, off_bipolar_cell_rhs!,

@@ -3,6 +3,18 @@
 # Spec §7.4
 # ============================================================
 
+
+"""
+    retinal_column_model!(du, u, p, t)
+
+Full ODE right-hand side for the retinal column.
+`p = (col::RetinalColumn, sidx::StateIndex, connections::Vector{ConnectionDef})`.
+"""
+function retinal_column_model!(du, u, p, t)
+    #P should be a tuple of 
+    
+end
+
 """
     zipper_rhs!(du, u, p, t)
 
