@@ -93,6 +93,11 @@ function off_bipolar_model!(du, u, p, t)
     V4 = params.V4
     phi = params.phi
 
+    # Extract glutamate receptor parameters
+    g_iGluR = params.g_iGluR
+    E_Glu = params.E_Glu
+    tau_iGluR = params.tau_iGluR
+
     # Extract glutamate release parameters
     alpha_Glu = params.alpha_Glu
     V_Glu_half = params.V_Glu_half
@@ -100,13 +105,10 @@ function off_bipolar_model!(du, u, p, t)
     tau_Glu = params.tau_Glu
 
     # Ionotropic glutamate gating (fast, tau ~ 3 ms)
-    tau_iGluR = 3.0
     ds_Glu = (glu_mean - s_Glu) / tau_iGluR
 
     # Excitatory synaptic current from photoreceptor glutamate
-    g_iGluR = 4.0  # nS (from connection table)
-    E_E = 0.0      # mV
-    I_Glu = g_iGluR * s_Glu * (V - E_E)
+    I_Glu = g_iGluR * s_Glu * (V - E_Glu)
 
     # Morris-Lecar activation functions
     m_inf = m_inf_ml(V, V1, V2)

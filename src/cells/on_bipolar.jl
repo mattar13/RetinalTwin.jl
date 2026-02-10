@@ -59,12 +59,9 @@ Morris-Lecar ON bipolar cell model with mGluR6 sign inversion.
 # Arguments
 - `du`: derivative vector (4 elements)
 - `u`: state vector (4 elements)
-- `p`: tuple `(params, mg, glu_mean, I_inh, I_mod)` where:
-  - `params`: named tuple from `default_on_bc_params()`
-  - `mg`: mGluR6Params struct with mGluR6-specific parameters
-  - `glu_mean`: mean glutamate concentration from photoreceptors
-  - `I_inh`: inhibitory synaptic current (pA)
-  - `I_mod`: modulatory current (pA)
+- `p`: tuple `(params, glu_received)` where:
+  - `params`: named tuple from `default_on_bc_params()` (includes mGluR6 parameters)
+  - `glu_received`: glutamate concentration from photoreceptors (µM)
 - `t`: time (ms)
 
 # State vector
@@ -73,6 +70,8 @@ Morris-Lecar ON bipolar cell model with mGluR6 sign inversion.
 # Notes
 The mGluR6 synapse inverts the glutamate signal: high Glu → cell hyperpolarized.
 TRPM1 conductance is maximal when S is low (light condition).
+All mGluR6 synapse parameters (g_TRPM1, E_TRPM1, alpha_mGluR6, tau_mGluR6) are
+included in the params named tuple.
 """
 function on_bipolar_model!(du, u, p, t)
     params, glu_received = p

@@ -1,126 +1,121 @@
 # ============================================================
-# retinal_column.jl — Column assembly and initial conditions
-# Spec §7.6
+# retinal_column.jl — Retinal column model with direct coupling
 # ============================================================
 
+# ── State organization ──────────────────────────────────────
+# For single photoreceptor + single ON bipolar cell:
+# u = [photoreceptor_states(21), on_bipolar_states(4)]
+# Total: 25 state variables
+
+const PHOTORECEPTOR_OFFSET = 0
+const PHOTORECEPTOR_SIZE = 21
+
+const ON_BIPOLAR_OFFSET = 21
+const ON_BIPOLAR_SIZE = 4
+
+# ── Default parameters ──────────────────────────────────────
+
 """
-    dark_adapted_state(col::RetinalColumn, sidx::StateIndex)
+    default_retinal_params()
 
-Compute initial conditions for a dark-adapted retina.
-Returns flat state vector u0.
+Load default parameters for photoreceptor and ON bipolar cells.
+
+# Returns
+NamedTuple with:
+- `PHOTORECEPTOR_PARAMS`: Rod photoreceptor parameters
+- `ON_BIPOLAR_PARAMS`: ON bipolar cell parameters
 """
-function dark_adapted_state(col::RetinalColumn, sidx::StateIndex)
-    u0 = zeros(sidx.total)
-    p = col.pop
+function default_retinal_params()
+    return (
+        PHOTORECEPTOR_PARAMS = default_rod_params_csv(),
+        ON_BIPOLAR_PARAMS = default_on_bc_params_csv()
+    )
+end
 
-    # Rods: biophysical dark state from docs/rod_photoreceptor_model.md
-    for i in 1:p.n_rod
-        offset = sidx.rod[1] + (i - 1) * ROD_STATE_VARS
-        u0[offset]      = -36.186   # V
-        u0[offset + 1]  = 0.430     # mKv
-        u0[offset + 2]  = 0.999     # hKv
-        u0[offset + 3]  = 0.436     # mCa
-        u0[offset + 4]  = 0.642     # mKCa
-        u0[offset + 5]  = 0.0966    # Ca_s
-        u0[offset + 6]  = 0.0966    # Ca_f
-        u0[offset + 7]  = 80.929    # Cab_ls
-        u0[offset + 8]  = 29.068    # Cab_hs
-        u0[offset + 9]  = 80.929    # Cab_lf
-        u0[offset + 10] = 29.068    # Cab_hf
-        u0[offset + 11] = 0.0       # Rh
-        u0[offset + 12] = 0.0       # Rhi
-        u0[offset + 13] = 0.0       # Tr
-        u0[offset + 14] = 0.0       # PDE
-        u0[offset + 15] = 0.3       # Ca_photo
-        u0[offset + 16] = 34.88     # Cab_photo
-        u0[offset + 17] = 2.0       # cGMP
-        u0[offset + 18] = rod_glutamate_release(u0[offset], col.rod_params)  # Glu
-    end
+# ── Initial conditions ──────────────────────────────────────
 
-    # Cones: same pattern as rods with cone dark values
-    G_ss_cone = col.cone_params.alpha_G / col.cone_params.beta_G
-    for i in 1:p.n_cone
-        offset = sidx.cone[1] + (i - 1) * CONE_STATE_VARS
-        u0[offset]     = 0.0
-        u0[offset + 1] = G_ss_cone               # G = steady-state cGMP
-        u0[offset + 2] = col.cone_params.Ca_dark
-        u0[offset + 3] = -40.0
-        u0[offset + 4] = 0.0
-        u0[offset + CONE_GLU_INDEX - 1] = 0.5
-    end
+"""
+    retinal_column_initial_conditions(params)
 
-    # Horizontal cells: partially depolarized by tonic glutamate
-    for i in 1:p.n_hc
-        offset = sidx.hc[1] + (i - 1) * 3
-        u0[offset]     = -50.0   # V (depolarized by PR glutamate)
-        u0[offset + 1] = 0.1     # w
-        u0[offset + 2] = 0.5     # s_Glu (tracking PR glutamate)
-    end
+Build initial conditions for photoreceptor + ON bipolar system.
 
-    # ON-Bipolar: hyperpolarized in dark (high Glu → mGluR6 active → TRPM1 closed)
-    for i in 1:p.n_on
-        offset = sidx.on_bc[1] + (i - 1) * 4
-        u0[offset]     = -60.0   # V (hyperpolarized)
-        u0[offset + 1] = 0.0     # w
-        u0[offset + 2] = 0.8     # S_mGluR6 (high, Glu is high)
-        u0[offset + 3] = 0.1     # Glu release (low, cell hyperpolarized)
-    end
+# Arguments
+- `params`: NamedTuple from `default_retinal_params()`
 
-    # OFF-Bipolar: depolarized in dark (receiving glutamate directly)
-    for i in 1:p.n_off
-        offset = sidx.off_bc[1] + (i - 1) * 4
-        u0[offset]     = -40.0   # V (somewhat depolarized)
-        u0[offset + 1] = 0.2     # w
-        u0[offset + 2] = 0.5     # s_Glu (tracking PR glutamate)
-        u0[offset + 3] = 0.3     # Glu release
-    end
+# Returns
+- 25-element state vector [photoreceptor(21), on_bipolar(4)]
+"""
+function retinal_column_initial_conditions(params)
+    # Get individual cell initial conditions
+    u0_photoreceptor = rod_dark_state(params.PHOTORECEPTOR_PARAMS)
+    u0_on_bipolar = on_bipolar_dark_state(params.ON_BIPOLAR_PARAMS)
 
-    # A2 Amacrines: near resting in dark
-    for i in 1:p.n_a2
-        offset = sidx.a2[1] + (i - 1) * 3
-        u0[offset]     = -60.0   # V
-        u0[offset + 1] = 0.0     # w
-        u0[offset + 2] = 0.0     # Gly
-    end
+    # Concatenate into single state vector
+    return vcat(u0_photoreceptor, u0_on_bipolar)
+end
 
-    # GABAergic Amacrines
-    for i in 1:p.n_gaba
-        offset = sidx.gaba_ac[1] + (i - 1) * 3
-        u0[offset]     = -60.0   # V
-        u0[offset + 1] = 0.0     # w
-        u0[offset + 2] = 0.0     # GABA
-    end
+# ── Auxiliary functions ─────────────────────────────────────
 
-    # DA Amacrine
-    for i in 1:p.n_dopa
-        offset = sidx.da_ac[1] + (i - 1) * 3
-        u0[offset]     = -60.0   # V
-        u0[offset + 1] = 0.0     # w
-        u0[offset + 2] = 0.0     # DA
-    end
+"""
+    compute_glutamate_release(V, V_half, V_slope, alpha)
 
-    # Ganglion cells
-    for i in 1:p.n_gc
-        offset = sidx.gc[1] + (i - 1) * 2
-        u0[offset]     = -65.0   # V
-        u0[offset + 1] = 0.0     # w
-    end
+Compute glutamate release from photoreceptor voltage using sigmoid.
+Higher (less negative) voltage → more glutamate release.
+"""
+function compute_glutamate_release(V::Real, V_half::Real, V_slope::Real, alpha::Real)
+    return alpha / (1.0 + exp(-(V - V_half) / V_slope))
+end
 
-    # Müller glia: resting K+ levels
-    for i in 1:p.n_muller
-        offset = sidx.muller[1] + (i - 1) * 4
-        u0[offset]     = -80.0                       # V_M (highly K+ permeable)
-        u0[offset + 1] = col.muller_params.K_o_rest  # K+_o endfoot
-        u0[offset + 2] = col.muller_params.K_o_rest  # K+_o stalk
-        u0[offset + 3] = 0.0                         # Glu_o
-    end
+# ── Main model function ─────────────────────────────────────
 
-    # RPE: resting
-    for i in 1:p.n_rpe
-        offset = sidx.rpe[1] + (i - 1) * 2
-        u0[offset]     = -60.0                     # V_RPE
-        u0[offset + 1] = col.rpe_params.K_sub_rest # K+_sub
-    end
+"""
+    retinal_column_model!(du, u, p, t)
 
-    return u0
+ODE right-hand side for photoreceptor → ON bipolar cell system.
+
+# Arguments
+- `du`: derivative vector (25 elements)
+- `u`: state vector (25 elements)
+- `p`: tuple `(params, stim_params)` where:
+  - `params`: NamedTuple from `default_retinal_params()`
+  - `stim_params`: NamedTuple with stimulus information (stim_start, stim_end, photon_flux, v_hold)
+- `t`: time (ms)
+
+# State vector organization
+```
+u[1:21]   → Photoreceptor states [R, T, P, G, HC1-5, mKv, hKv, mCa, mKCa, Ca_s, Ca_f, CaB_ls, CaB_hs, CaB_lf, CaB_hf, V, Glu]
+u[22:25]  → ON bipolar states [V, w, S_mGluR6, Glu_release]
+```
+
+# Notes
+- Photoreceptor computes its own glutamate release (u[21])
+- Glutamate is passed directly to ON bipolar cell
+- ON bipolar inverts signal via mGluR6 cascade
+"""
+function retinal_column_model!(du, u, p, t)
+    params, stim_params = p
+
+    # === Extract state segments using views (efficient, no copying) ===
+    u_photoreceptor = @view u[1:21]
+    u_on_bipolar = @view u[22:25]
+
+    du_photoreceptor = @view du[1:21]
+    du_on_bipolar = @view du[22:25]
+
+    # === Neurotransmitter coupling ===
+
+    # Get glutamate release from photoreceptor state
+    glu_release = u_photoreceptor[ROD_GLU_INDEX]
+
+    # === Call individual cell models ===
+
+    # Photoreceptor
+    rod_model!(du_photoreceptor, u_photoreceptor,
+               (params.PHOTORECEPTOR_PARAMS, stim_params), t)
+
+    # ON bipolar (receives glutamate from photoreceptor)
+    on_bipolar_model!(du_on_bipolar, u_on_bipolar,
+                      (params.ON_BIPOLAR_PARAMS, glu_release), t)
+
+    return nothing
 end

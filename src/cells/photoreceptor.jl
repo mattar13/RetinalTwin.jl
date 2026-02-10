@@ -4,7 +4,7 @@
 
 # ── State indices ───────────────────────────────────────────
 
-const ROD_STATE_VARS = 20
+const ROD_STATE_VARS = 21
 const ROD_R_INDEX = 1
 const ROD_T_INDEX = 2
 const ROD_P_INDEX = 3
@@ -25,6 +25,7 @@ const ROD_CAB_HS_INDEX = 17
 const ROD_CAB_LF_INDEX = 18
 const ROD_CAB_HF_INDEX = 19
 const ROD_V_INDEX = 20
+const ROD_GLU_INDEX = 21
 
 # ── 1. Default Parameters ───────────────────────────────────
 
@@ -49,7 +50,7 @@ Return dark-adapted initial conditions for a rod photoreceptor.
 - `params`: named tuple from `default_rod_params()`
 
 # Returns
-- 20-element state vector corresponding to dark-adapted equilibrium
+- 21-element state vector corresponding to dark-adapted equilibrium
 """
 function rod_dark_state(params)
     u0 = zeros(ROD_STATE_VARS)
@@ -83,6 +84,13 @@ function rod_dark_state(params)
 
     # Membrane potential
     u0[ROD_V_INDEX] = -36.186     # V
+
+    # Glutamate release (compute from dark voltage)
+    V_dark = u0[ROD_V_INDEX]
+    V_Glu_half = params.V_Glu_half
+    V_Glu_slope = params.V_Glu_slope
+    alpha_Glu = params.alpha_Glu
+    u0[ROD_GLU_INDEX] = alpha_Glu / (1.0 + exp(-(V_dark - V_Glu_half) / V_Glu_slope))
 
     return u0
 end
@@ -156,31 +164,38 @@ end
     rod_model!(du, u, p, t)
 
 Biophysical rod photoreceptor model with simplified phototransduction cascade,
-5-state Ih gating, and detailed Ca dynamics.
+5-state Ih gating, detailed Ca dynamics, and glutamate release.
 
 # Arguments
-- `du`: derivative vector (20 elements)
-- `u`: state vector (20 elements)
-- `p`: tuple `(params, stim_start, stim_end, photon_flux, v_hold, I_feedback)` where:
+- `du`: derivative vector (21 elements)
+- `u`: state vector (21 elements)
+- `p`: tuple `(params, stim_params)` where:
   - `params`: named tuple from `default_rod_params()`
-  - `stim_start`: stimulus onset time (ms)
-  - `stim_end`: stimulus offset time (ms)
-  - `photon_flux`: photon flux (photons/µm²/ms)
-  - `v_hold`: boolean, if true holds voltage at dark value
-  - `I_feedback`: feedback current (pA)
+  - `stim_params`: NamedTuple with stimulus information:
+    - `stim_start`: stimulus onset time (ms)
+    - `stim_end`: stimulus offset time (ms)
+    - `photon_flux`: photon flux (photons/µm²/ms)
+    - `v_hold`: boolean, if true holds voltage at dark value
+    - `I_feedback`: feedback current (pA)
 - `t`: time (ms)
 
 # State vector
 `u = [R, T, P, G, HC1, HC2, HO1, HO2, HO3, mKv, hKv, mCa, mKCa,
-      Ca_s, Ca_f, CaB_ls, CaB_hs, CaB_lf, CaB_hf, V]`
+      Ca_s, Ca_f, CaB_ls, CaB_hs, CaB_lf, CaB_hf, V, Glu]`
 """
 function rod_model!(du, u, p, t)
     # Unpack parameters and stimulus info
-    params, stim_start, stim_end, photon_flux, I_feedback = p
+    params, stim_params = p
+
+    # Extract stimulus parameters
+    stim_start = stim_params.stim_start
+    stim_end = stim_params.stim_end
+    photon_flux = stim_params.photon_flux
+    I_feedback = stim_params.I_feedback
 
     # Decompose state vector using tuple unpacking
     R, T, P, G, HC1, HC2, HO1, HO2, HO3, mKv, hKv, mCa, mKCa,
-        Ca_s, Ca_f, CaB_ls, CaB_hs, CaB_lf, CaB_hf, V = u
+        Ca_s, Ca_f, CaB_ls, CaB_hs, CaB_lf, CaB_hf, V, Glu = u
 
     # Extract parameters (using non-Greek names from CSV)
     aC = params.aC
@@ -223,6 +238,10 @@ function rod_model!(du, u, p, t)
     K_ex = params.K_ex
     J_ex2 = params.J_ex2
     K_ex2 = params.K_ex2
+    alpha_Glu = params.alpha_Glu
+    V_Glu_half = params.V_Glu_half
+    V_Glu_slope = params.V_Glu_slope
+    tau_Glu = params.tau_Glu
 
     # ── Stimulus ──
     Phi = Stim(t, stim_start, stim_end, photon_flux)
@@ -292,11 +311,15 @@ function rod_model!(du, u, p, t)
     # ── Voltage ──
     dV = -(iPHOTO + iLEAK + iH + iCa + iCl + iKCa + iKV + iEX + iEX2 + I_feedback) / C_m
 
+    # ── Glutamate release dynamics (voltage-dependent) ──
+    R_glu_inf = alpha_Glu / (1.0 + exp(-(V - V_Glu_half) / V_Glu_slope))
+    dGlu = (R_glu_inf - Glu) / tau_Glu
+
     # ── Assign all derivatives to du ──
     du .= [dR, dT, dP, dG, dHC1, dHC2, dHO1, dHO2, dHO3,
            dmKv, dhKv, dmCa, dmKCa,
            dCa_s, dCa_f, dCaB_ls, dCaB_hs, dCaB_lf, dCaB_hf,
-           dV]
+           dV, dGlu]
 
     return nothing
 end
