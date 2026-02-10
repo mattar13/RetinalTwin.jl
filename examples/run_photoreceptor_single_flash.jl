@@ -13,14 +13,16 @@ using CairoMakie
 rod_params = default_rod_params()
 
 # Stimulus parameters
-intensity = 10.0   # photons/µm²/ms (small flash)
-stim_start = 50.0  # ms
-stim_end = 55.0    # ms (instantaneous flash)
-v_hold = false     # don't clamp voltage
-I_feedback = 0.0   # pA
+stim_params = (
+    stim_start = 50.0,    # ms
+    stim_end = 55.0,      # ms (5 ms flash)
+    photon_flux = 10.0,   # photons/µm²/ms (small flash)
+    v_hold = false,       # don't clamp voltage
+    I_feedback = 0.0      # pA
+)
 
 println("Standalone rod photoreceptor")
-println("  Stimulus: $(intensity) ph/µm²/ms, onset=$(stim_start) ms")
+println("  Stimulus: $(stim_params.photon_flux) ph/µm²/ms, onset=$(stim_params.stim_start) ms")
 
 # ── 2. Dark-adapted initial conditions ────────────────────────
 
@@ -29,7 +31,7 @@ println("Initial rod state (dark adapted): V=$(u0[RetinalTwin.ROD_V_INDEX]) mV, 
 
 # ── 3. Rod ODE ─────────────────────────────────────────────────
 
-p = (rod_params, stim_start, stim_end, intensity, v_hold, I_feedback)
+p = (rod_params, stim_params)
 tspan = (0.0, 500.0)
 prob = ODEProblem(rod_model!, u0, tspan, p)
 
