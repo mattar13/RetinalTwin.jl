@@ -33,7 +33,7 @@ println("Initial rod state (dark adapted): V=$(u0[RetinalTwin.ROD_V_INDEX]) mV, 
 # ── 3. Rod-only ODE ──────────────────────────────────────────
 
 p = (rod_params, stim, 0.0)
-tspan = (0.0, 1000.0)
+tspan = (0.0, 10.0)
 prob = ODEProblem(rod_rhs!, u0, tspan, p)
 
 println("\nSolving rod-only model...")
