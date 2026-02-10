@@ -4,8 +4,10 @@ authors = ["Matt Tarchick"]
 version = "0.1.0"
 
 [deps]
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 DSP = "717857b8-e6f2-59f4-9121-6e50c889abd2"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
 FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
 GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
@@ -16,6 +18,7 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [compat]
+CSV = "0.10.15"
 CairoMakie = "0.15.8"
 DSP = "0.8.4"
 DifferentialEquations = "7.17.0"
