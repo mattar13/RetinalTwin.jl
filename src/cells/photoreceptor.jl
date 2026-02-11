@@ -183,7 +183,7 @@ Biophysical rod photoreceptor model with simplified phototransduction cascade,
 `u = [R, T, P, G, HC1, HC2, HO1, HO2, HO3, mKv, hKv, mCa, mKCa,
       Ca_s, Ca_f, CaB_ls, CaB_hs, CaB_lf, CaB_hf, V, Glu]`
 """
-function rod_model!(du, u, p, t)
+function photoreceptor_model!(du, u, p, t)
     # Unpack parameters and stimulus info
     params, stim_params = p
 
@@ -191,7 +191,6 @@ function rod_model!(du, u, p, t)
     stim_start = stim_params.stim_start
     stim_end = stim_params.stim_end
     photon_flux = stim_params.photon_flux
-    I_feedback = stim_params.I_feedback
 
     # Decompose state vector using tuple unpacking
     R, T, P, G, HC1, HC2, HO1, HO2, HO3, mKv, hKv, mCa, mKCa,
@@ -309,7 +308,7 @@ function rod_model!(du, u, p, t)
     dCaB_hf = Hb1 * Ca_f * (Bh - CaB_hf) - Hb2 * CaB_hf
 
     # ── Voltage ──
-    dV = -(iPHOTO + iLEAK + iH + iCa + iCl + iKCa + iKV + iEX + iEX2 + I_feedback) / C_m
+    dV = -(iPHOTO + iLEAK + iH + iCa + iCl + iKCa + iKV + iEX + iEX2) / C_m
 
     # ── Glutamate release dynamics (voltage-dependent) ──
     R_glu_inf = alpha_Glu / (1.0 + exp(-(V - V_Glu_half) / V_Glu_slope))
