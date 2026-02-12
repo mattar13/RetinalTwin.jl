@@ -13,7 +13,11 @@
       "Bash(git -C \"c:\\\\Users\\\\mtarc\\\\Julia\\\\dev\\\\VisualPathwayTwin.jl\" log --all --oneline)",
       "Bash(julia -e:*)",
       "Bash(echo:*)",
-      "Bash(julia:*)"
+      "Bash(julia:*)",
+      "Bash(wc:*)",
+      "Bash(find:*)",
+      "Bash(for file in *.csv)",
+      "Bash(done)"
     ]
   }
 }
