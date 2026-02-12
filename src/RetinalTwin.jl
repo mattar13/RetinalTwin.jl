@@ -57,7 +57,7 @@ export
     retinal_column_initial_conditions,
     retinal_column_model!,
     # Individual cell models
-    rod_dark_state, rod_model!,
+    rod_dark_state, photoreceptor_model!,
     horizontal_dark_state, horizontal_model!,
     on_bipolar_dark_state, on_bipolar_model!,
     off_bipolar_dark_state, off_bipolar_model!,
