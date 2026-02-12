@@ -29,9 +29,10 @@ stim_params_dark = (
     photon_flux = 0.0
 )
 
-prob = ODEProblem(photoreceptor_model!, u0, tspan, (photoreceptor_params, stim_params_dark))
-ss_sol = solve(prob, Rodas5(); saveat=1.0, abstol=1e-6, reltol=1e-4)
-u0 = ss_sol.u[end]
+tspan = (0.0, 1000.0)
+prob = SteadyStateProblem(retinal_column_model!, u0, (params, stim_params_dark))
+ss_sol = solve(prob, DynamicSS(Rodas5()); abstol=1e-6, reltol=1e-4)
+u0 = ss_sol.u
 
 
 # ── 4. Stimulus parameters ────────────────────────────────────
