@@ -4,14 +4,14 @@
 
 # ── State organization ──────────────────────────────────────
 # For single photoreceptor + single ON bipolar cell:
-# u = [photoreceptor_states(21), on_bipolar_states(4)]
+# u = [photoreceptor_states(21), on_bipolar_states(7)]
 # Total: 25 state variables
 
 const PHOTORECEPTOR_OFFSET = 0
 const PHOTORECEPTOR_SIZE = 21
 
-const ON_BIPOLAR_OFFSET = 21
-const ON_BIPOLAR_SIZE = 4
+const ON_BIPOLAR_OFFSET = 22
+const ON_BIPOLAR_SIZE = 6
 
 # ── Default parameters ──────────────────────────────────────
 
@@ -96,12 +96,10 @@ function retinal_column_model!(du, u, p, t)
     params, stim_params = p
 
     # === Extract state segments using views (efficient, no copying) ===
-    u_photoreceptor = @view u[1:21]
-    u_on_bipolar = @view u[22:25]
-
-    du_photoreceptor = @view du[1:21]
-    du_on_bipolar = @view du[22:25]
-
+    u_photoreceptor = @view u[1:PHOTORECEPTOR_SIZE]
+    u_on_bipolar = @view u[ON_BIPOLAR_OFFSET:ON_BIPOLAR_OFFSET + ON_BIPOLAR_SIZE - 1]
+    du_photoreceptor = @view du[1:PHOTORECEPTOR_SIZE]
+    du_on_bipolar = @view du[ON_BIPOLAR_OFFSET:ON_BIPOLAR_OFFSET + ON_BIPOLAR_SIZE - 1]
     # === Neurotransmitter coupling ===
 
     # Get glutamate release from photoreceptor state
@@ -110,7 +108,7 @@ function retinal_column_model!(du, u, p, t)
     # === Call individual cell models ===
 
     # Photoreceptor
-    rod_model!(du_photoreceptor, u_photoreceptor,
+    photoreceptor_model!(du_photoreceptor, u_photoreceptor,
                (params.PHOTORECEPTOR_PARAMS, stim_params), t)
 
     # ON bipolar (receives glutamate from photoreceptor)

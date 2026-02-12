@@ -1,21 +1,34 @@
 Key,Value,Description
-C_m,20.0,Membrane capacitance (pF)
-g_L,2.0,Leak conductance (nS)
-g_Ca,4.0,Ca conductance (nS)
-g_K,8.0,K conductance (nS)
-E_L,-60.0,Leak reversal potential (mV)
-E_Ca,120.0,Ca reversal potential (mV)
-E_K,-84.0,K reversal potential (mV)
-V1,-1.2,Ca activation midpoint (mV)
-V2,18.0,Ca activation slope (mV)
-V3,12.0,K activation midpoint (mV)
-V4,17.0,K activation slope (mV)
-phi,0.067,Recovery time scale
-g_TRPM1,10.0,mGluR6 TRPM1 max conductance (nS)
+C_m,30.0,Membrane capacitance (pF)
+g_L,1.0,Leak conductance (nS)
+E_L,-55.0,Leak reversal potential (mV)
+g_TRPM1,3.0,TRPM1 nonselective cation conductance (nS)
 E_TRPM1,0.0,TRPM1 reversal potential (mV)
-alpha_mGluR6,1.0,mGluR6 cascade scaling factor
-tau_mGluR6,30.0,mGluR6 metabotropic time constant (ms)
-alpha_Glu,1.0,Max glutamate release
-V_Glu_half,-35.0,Release half-activation (mV)
-V_Glu_slope,5.0,Release slope (mV)
-tau_Glu,5.0,Glutamate clearance time (ms)
+K_Glu,0.50,Glutamate half-activation for mGluR6 cascade (same units as input)
+n_Glu,20.0,Hill coefficient for glutamate-mGluR6 coupling
+a_S, 0.5, Glutamate-mGluR6 coupling scaling factor
+tau_S,50.0,mGluR6 cascade time constant (ms)
+g_Kv,4.0,Delayed rectifier K conductance (Kv1 family, nS)
+E_K,-85.0,Potassium reversal potential (mV)
+Vn_half,-30.0,Kv activation midpoint (mV)
+kn_slope,9.0,Kv activation slope (mV)
+tau_n,8.0,Kv activation time constant (ms)
+g_h,1.0,HCN (Ih) conductance (nS)
+E_h,-35.0,Ih reversal potential (mV)
+Vh_half,-80.0,Ih activation midpoint (mV)
+kh_slope,-8.0,Ih activation slope (negative = opens on hyperpolarization)
+tau_h,80.0,Ih activation time constant (ms)
+g_CaL,0.8,L-type Ca conductance (nS)
+E_Ca,60.0,Calcium reversal potential (mV, effective)
+Vm_half,-35.0,CaL activation midpoint (mV)
+km_slope,7.0,CaL activation slope (mV)
+tau_m,3.0,CaL activation time constant (ms)
+tau_c,40.0,Intracellular Ca pool decay time constant (ms)
+k_c,0.005,Ca influx to pool scaling factor
+g_KCa,1.5,Ca-activated K conductance (nS)
+K_c,0.5,Ca half-activation for KCa channel
+n_c,2.0,Hill coefficient for Ca-activated K
+K_Release,1.0,Glutamate release half-activation (µM)
+n_Release,1.0,Hill coefficient for glutamate release
+a_Release,0.60,Glutamate release scaling factor
+tau_Release,1.0,Glutamate release time constant (ms)

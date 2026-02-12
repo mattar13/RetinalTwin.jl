@@ -4,11 +4,13 @@
 
 # ── State indices ───────────────────────────────────────────
 
-const ONBC_STATE_VARS = 4
+const ONBC_STATE_VARS = 6
 const ONBC_V_INDEX = 1
 const ONBC_W_INDEX = 2
 const ONBC_S_INDEX = 3  # mGluR6 state
 const ONBC_GLU_INDEX = 4
+const ONBC_CA_INDEX = 5
+const ONBC_GLU_INDEX = 6
 
 # ── 1. Default Parameters ───────────────────────────────────
 
@@ -33,22 +35,42 @@ Return dark-adapted initial conditions for an ON bipolar cell.
 - `params`: named tuple from `default_on_bc_params()`
 
 # Returns
-- 4-element state vector [V, w, S_mGluR6, Glu_release]
+- 6-element state vector [V, w, S_mGluR6, Glu_release, Ca, Glu]
 """
 function on_bipolar_dark_state(params)
-    u0 = zeros(ONBC_STATE_VARS)
-    u0[ONBC_V_INDEX] = -60.0      # Resting potential
-    u0[ONBC_W_INDEX] = 0.01       # Small recovery variable
-    u0[ONBC_S_INDEX] = 0.0        # mGluR6 state
-    u0[ONBC_GLU_INDEX] = 0.0      # No glutamate release at rest
-    return u0
+    V0 = -60.0
+    n0 = gate_inf(V0, params.Vn_half, params.kn_slope)
+    h0 = gate_inf(V0, params.Vh_half, params.kh_slope)
+    c0 = 0.0
+    S0 = 0.0
+    Glu0 = 0.0
+    return [V0, n0, h0, c0, S0, Glu0]
 end
 
 # ── 3. Auxiliary Functions ──────────────────────────────────
 
-# Use shared ML functions from horizontal.jl
-# m_inf_ml(V, V1, V2), w_inf_ml(V, V3, V4), tau_w_ml(V, V3, V4)
+@inline σ(x) = 1.0 / (1.0 + exp(-x))
 
+@inline function gate_inf(V, Vhalf, k)
+    # logistic with slope k (mV). k can be negative (e.g. Ih)
+    return 1.0 / (1.0 + exp(-(V - Vhalf) / k))
+end
+
+@inline function hill(x, K, n)
+    # bounded [0,1], handles x>=0
+    xn = x^n
+    return xn / (K^n + xn + eps())
+end
+
+"""
+mGluR6 activation function
+"""
+@inline S_inf(glu_received, K_Glu, n_Glu) = 1 / (1 + (glu_received / K_Glu)^n_Glu)
+
+"""
+Release function for glutamate release from the ON bipolar cell.
+"""
+@inline R_inf(Ca, K_Release, n_Release) = (Ca^n_Release) / (K_Release^n_Release + Ca^n_Release + eps())
 # ── 4. Mathematical Model ───────────────────────────────────
 
 """
@@ -75,60 +97,45 @@ included in the params named tuple.
 """
 function on_bipolar_model!(du, u, p, t)
     params, glu_received = p
+    V, n, h, c, S, G = u
 
-    # Decompose state vector using tuple unpacking
-    V, w, S, Glu_rel = u
+    # -------- mGluR6 cascade -> TRPM1 gating --------
+    # High glutamate (dark) => G≈1 => S→1 => TRPM1 closed
+    # Low glutamate (light) => G≈0 => S→0 => TRPM1 open
+    S_INF = S_inf(max(glu_received, 0.0), params.K_Glu, params.n_Glu)
+    dS = (params.a_S * S_INF - S) / params.tau_S
 
-    # Extract Morris-Lecar parameters
-    C_m = params.C_m
-    g_L = params.g_L
-    g_Ca = params.g_Ca
-    g_K = params.g_K
-    E_L = params.E_L
-    E_Ca = params.E_Ca
-    E_K = params.E_K
-    V1 = params.V1
-    V2 = params.V2
-    V3 = params.V3
-    V4 = params.V4
-    phi = params.phi
+    # -------- gating dynamics --------
+    n_inf = gate_inf(V, params.Vn_half, params.kn_slope)
+    dn = (n_inf - n) / params.tau_n
 
-    # Extract glutamate release parameters
-    alpha_mGluR6 = params.alpha_mGluR6
-    tau_mGluR6 = params.tau_mGluR6
-    g_TRPM1 = params.g_TRPM1
-    E_TRPM1 = params.E_TRPM1
-    alpha_Glu = params.alpha_Glu
-    V_Glu_half = params.V_Glu_half
-    V_Glu_slope = params.V_Glu_slope
-    tau_Glu = params.tau_Glu
+    h_inf = gate_inf(V, params.Vh_half, params.kh_slope) # kh_slope < 0 for Ih
+    dh = (h_inf - h) / params.tau_h
 
-    # mGluR6 cascade: tracks glutamate with metabotropic kinetics
-    dS = (alpha_mGluR6 * glu_received - S) / tau_mGluR6
+    m_inf = gate_inf(V, params.Vm_half, params.km_slope) # CaL activation (instant-ish)
+    # if you want dynamic m, swap to a state variable; here we keep it simple
 
-    # TRPM1 conductance (sign-inverted: low S → high conductance → depolarization)
-    I_TRPM1 = g_TRPM1 * (1.0 - S) * (V - E_TRPM1)
+    # -------- currents (I = g * gate * (V - E)) --------
+    I_L     = params.g_L * (V - params.E_L)
+    I_TRPM1 = params.g_TRPM1 * S * (V - params.E_TRPM1)
+    I_Kv    = params.g_Kv * n * (V - params.E_K)
+    I_h     = params.g_h * h * (V - params.E_h)
+    I_CaL   = params.g_CaL * m_inf * (V - params.E_Ca)
 
-    # Morris-Lecar activation functions
-    m_inf = m_inf_ml(V, V1, V2)
-    w_inf = w_inf_ml(V, V3, V4)
-    tau_w = tau_w_ml(V, V3, V4)
+    #-------- Ca pool --------
+    # driven by inward Ca current only (when I_CaL is negative)
+    Ca_in = max(-I_CaL, 0.0)
+    dc = (-c / params.tau_c) + params.k_c * Ca_in
 
-    # Membrane currents
-    I_L = g_L * (V - E_L)
-    I_Ca = g_Ca * m_inf * (V - E_Ca)
-    I_K = g_K * w * (V - E_K)
+    # KCa activation from Ca pool
+    a_c = hill(max(c, 0.0), params.K_c, params.n_c)
+    I_KCa = params.g_KCa * a_c * (V - params.E_K)
 
-    # Derivatives
-    dV = (-I_L - I_Ca - I_K - I_TRPM1 + I_inh + I_mod) / C_m
-    dw = phi * (w_inf - w) / max(tau_w, 0.1)
-
-    # Glutamate release (graded, voltage-dependent)
-    R_glu = 1.0 / (1.0 + exp(-(V - V_Glu_half) / V_Glu_slope))
-    dGlu_rel = (alpha_Glu * R_glu - Glu_rel) / tau_Glu
-
-    # Assign derivatives
-    du .= [dV, dw, dS, dGlu_rel]
-
+    # -------- voltage derivative --------
+    dV = (-I_L - I_TRPM1 - I_Kv - I_h - I_CaL - I_KCa) / params.C_m
+    
+    # -------- glutamate release --------
+    dG = (params.a_Release * R_inf(c, params.K_Release, params.n_Release) - G) / params.tau_Release # dG/dt = (a_Release * R_inf(Ca, K_Release, n_Release) - G) / tau_Release
+    du .= (dV, dn, dh, dc, dS, dG)
     return nothing
 end
