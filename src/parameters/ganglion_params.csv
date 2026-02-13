@@ -1,17 +1,22 @@
 Key,Value,Description
-C_m,25.0,Membrane capacitance (pF)
+# --- Membrane ---
+C_m,20.0,Membrane capacitance (pF)
 g_L,2.0,Leak conductance (nS)
-g_Ca,5.0,Ca conductance (nS)
-g_K,10.0,K conductance (nS)
 E_L,-65.0,Leak reversal potential (mV)
-E_Ca,120.0,Ca reversal potential (mV)
-E_K,-84.0,K reversal potential (mV)
-V1,-1.2,Ca activation midpoint (mV)
-V2,18.0,Ca activation slope (mV)
-V3,2.0,K activation midpoint (mV)
-V4,17.0,K activation slope (mV)
-phi,0.04,Recovery time scale
-alpha_NT,0.0,Max neurotransmitter release (none)
-V_NT_half,0.0,Release half-activation (mV)
-V_NT_slope,0.0,Release slope (mV)
-tau_NT,0.0,NT clearance time (ms)
+
+g_Na,200.0,Fast voltage-gated sodium conductance (nS)
+E_Na,55.0,Sodium reversal potential (mV)
+g_K,60.0,Delayed rectifier potassium conductance (nS)
+E_K,-85.0,Potassium reversal potential (mV)
+
+g_E,12.0,Excitatory synaptic max conductance (nS)
+E_E,0.0,Excitatory reversal potential (mV)
+tau_E,2.0,Excitatory synapse gating time constant (ms)
+K_preE,0.5,Half-activation for mapping ONBC glutamate proxy -> excitatory drive
+n_preE,2.0,Hill coefficient for excitatory presynaptic mapping
+
+g_I,18.0,Inhibitory synaptic max conductance (nS)
+E_I,-70.0,Inhibitory reversal potential (mV)
+tau_I,8.0,Inhibitory synapse gating time constant (ms)
+K_preI,0.3,Half-activation for mapping AII glycine proxy -> inhibitory drive
+n_preI,2.0,Hill coefficient for inhibitory presynaptic mapping
