@@ -13,6 +13,8 @@ DEFAULT_INDEXES = (
     OFFBC_ICS_ID_END = 34,
     A2_ICS_ID_BEGIN = 35,
     A2_ICS_ID_END = 41,
+    GC_ICS_ID_BEGIN = 42,
+    GC_ICS_ID_END = 47,
     #Next we can define the neurotransmitter indices
     PC_GLU_INDEX = 21,
     ONBC_GLU_INDEX = 6,
@@ -38,7 +40,8 @@ function default_retinal_params()
         PHOTORECEPTOR_PARAMS = default_rod_params(),
         ON_BIPOLAR_PARAMS = default_on_bc_params(),
         OFF_BIPOLAR_PARAMS = default_off_bc_params(),
-        A2_AMACRINE_PARAMS = default_a2_params()
+        A2_AMACRINE_PARAMS = default_a2_params(),
+        GANGLION_PARAMS = default_gc_params()
     )
 end
 
@@ -78,9 +81,14 @@ function retinal_column_initial_conditions(params)
     ic_size += length(u0_a2)
     println("IC size after a2: $ic_size")
 
+    u0_gc = ganglion_dark_state(params.GANGLION_PARAMS)
+    println("Size of ganglion state vector: $(length(u0_gc))")
+    ic_size += length(u0_gc)
+    println("IC size after ganglion: $ic_size")
+
     println("Total size of initial condition vector: $ic_size")
     # Concatenate into single state vector
-    return vcat(u0_photoreceptor, u0_on_bipolar, u0_off_bipolar, u0_a2)
+    return vcat(u0_photoreceptor, u0_on_bipolar, u0_off_bipolar, u0_a2, u0_gc)
 end
 
 # ── Auxillary Functions ─────────────────────────────────────
@@ -132,11 +140,13 @@ function retinal_column_model!(du, u, p, t)
     u_on_bipolar = @view u[idxs.ONBC_ICS_ID_BEGIN:idxs.ONBC_ICS_ID_END]
     u_off_bipolar = @view u[idxs.OFFBC_ICS_ID_BEGIN:idxs.OFFBC_ICS_ID_END]
     u_a2 = @view u[idxs.A2_ICS_ID_BEGIN:idxs.A2_ICS_ID_END]
+    u_gc = @view u[idxs.GC_ICS_ID_BEGIN:idxs.GC_ICS_ID_END]
 
     du_photoreceptor = @view du[idxs.PC_ICS_ID_BEGIN:idxs.PC_ICS_ID_END]
     du_on_bipolar = @view du[idxs.ONBC_ICS_ID_BEGIN:idxs.ONBC_ICS_ID_END]
     du_off_bipolar = @view du[idxs.OFFBC_ICS_ID_BEGIN:idxs.OFFBC_ICS_ID_END]
     du_a2 = @view du[idxs.A2_ICS_ID_BEGIN:idxs.A2_ICS_ID_END]
+    du_gc = @view du[idxs.GC_ICS_ID_BEGIN:idxs.GC_ICS_ID_END]
     # === Neurotransmitter coupling ===
 
     # Get glutamate release from photoreceptor state
@@ -158,6 +168,10 @@ function retinal_column_model!(du, u, p, t)
     # A2 amacrine cell (receives glutamate from ON bipolar cell)
     a2_model!(du_a2, u_a2, (params.A2_AMACRINE_PARAMS, glu_on_bipolar_release), t)
     gly_a2_release = u_a2[idxs.A2_GLY_INDEX]
+
+    # Ganglion cell (receives excitatory bipolar and inhibitory A2 amacrine drive)
+    glu_gc_exc = glu_on_bipolar_release + glu_off_bipolar_release
+    ganglion_model!(du_gc, u_gc, (params.GANGLION_PARAMS, glu_gc_exc, gly_a2_release), t)
 
     #Electrical coupling between cells
     gap_junction_coupling(du_a2[1], u_a2[1], du_on_bipolar[1], u_on_bipolar[1], params.A2_AMACRINE_PARAMS.C_m, params.ON_BIPOLAR_PARAMS.C_m, params.A2_AMACRINE_PARAMS.g_gap)

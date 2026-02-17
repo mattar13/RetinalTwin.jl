@@ -50,8 +50,8 @@ export
 include("stimulus_protocols/single_flash.jl")
 export single_flash
 
-# --- ERG ---
-include("erg/field_potential.jl")
+# # --- ERG ---
+# include("erg/field_potential.jl")
 
 # --- Visualization ---
 include("visualization/plots.jl")

@@ -13,17 +13,19 @@ Return dark-adapted initial conditions for a ganglion cell.
 - `params`: named tuple from `default_gc_params()`
 
 # Returns
-- 2-element state vector [V, w]
+- 6-element state vector [V, m, h, n, sE, sI]
 """
 function ganglion_dark_state(params)
     V0 = -60.0
-    n0 = gate_inf(V0, params.Vn_half, params.kn_slope)
-    h0 = gate_inf(V0, params.Vh_half, params.kh_slope)
-    c0 = 0.0
-    A0 = 0.0
-    D0 = 0.0
-    Y0 = 0.0
-    return [V0, n0, h0, c0, A0, D0, Y0]
+    αm, βm = alpha_beta_m(V0)
+    αh, βh = alpha_beta_h(V0)
+    αn, βn = alpha_beta_n(V0)
+    m0 = αm / (αm + βm + eps())
+    h0 = αh / (αh + βh + eps())
+    n0 = αn / (αn + βn + eps())
+    sE0 = 0.0
+    sI0 = 0.0
+    return [V0, m0, h0, n0, sE0, sI0]
 end
 # ── 3. Auxiliary Functions ──────────────────────────────────
 
@@ -71,8 +73,8 @@ end
 Morris-Lecar ganglion cell model.
 
 # Arguments
-- `du`: derivative vector (2 elements)
-- `u`: state vector (2 elements)
+- `du`: derivative vector (6 elements)
+- `u`: state vector (6 elements)
 - `p`: tuple `(params, I_exc, I_inh)` where:
   - `params`: named tuple from `default_gc_params()`
   - `I_exc`: excitatory synaptic current from bipolars (pA)
@@ -80,11 +82,13 @@ Morris-Lecar ganglion cell model.
 - `t`: time (ms)
 
 # State vector
-`u = [V, w]`
+`u = [V, m, h, n, sE, sI]`
 
 # Notes
 Output neuron for action potential generation. Receives excitatory
 input from ON/OFF bipolars and inhibitory input from amacrines.
+
+#TODO: We eventually will want to write the ganglion cell output. 
 """
 function ganglion_model!(du, u, p, t)
     params, glu_in, gly_in = p
