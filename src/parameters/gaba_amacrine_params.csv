@@ -1,5 +1,6 @@
 Key,Value,Description
 C_m,10.0,Membrane capacitance (pF)
+I_app,0.0,Applied current (pA)
 g_L,2.0,Leak conductance (nS)
 g_Ca,8.0,Ca conductance (nS)
 g_K,12.0,K conductance (nS)

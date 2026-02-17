@@ -1,5 +1,6 @@
 Key,Value,Description
 C_m,30.0,Membrane capacitance (pF)
+I_app,0.0,Applied current (pA)
 g_L,1.0,Leak conductance (nS)
 E_L,-55.0,Leak reversal potential (mV)
 

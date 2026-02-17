@@ -106,7 +106,7 @@ function da_model!(du, u, p, t)
     I_K = g_K * w * (V - E_K)
 
     # Derivatives
-    dV = (-I_L - I_Ca - I_K + I_exc) / C_m
+    dV = (-I_L - I_Ca - I_K + I_exc + params.I_app) / C_m
     dw = phi * (w_inf - w) / max(tau_w, 0.1)
 
     # Dopamine release (very slow)

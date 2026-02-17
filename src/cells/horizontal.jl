@@ -127,7 +127,7 @@ function horizontal_model!(du, u, p, t)
     I_K = g_K * w * (V - E_K)
 
     # Derivatives
-    dV = (-I_L - I_Ca - I_K + I_exc + I_gap) / C_m
+    dV = (-I_L - I_Ca - I_K + I_exc + I_gap + params.I_app) / C_m
     dw = phi * (w_inf - w) / max(tau_w, 0.1)
     ds_Glu = (glu_mean - s_Glu) / params.tau_Glu
 

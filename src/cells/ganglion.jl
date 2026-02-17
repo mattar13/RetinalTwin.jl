@@ -93,19 +93,18 @@ input from ON/OFF bipolars and inhibitory input from amacrines.
 function ganglion_model!(du, u, p, t)
     params, glu_in, gly_in = p
     V, m, h, n, sE, sI = u
-
+    #glu_in = 10.0 #Hold this for now to see if we can get spiking
+    #gly_in = 0.0 #Hold this for now to see if we can get spiking
     # ----- presynaptic drive -> synaptic open probability targets -----
     # Treat glu_in and gly_in as "release proxies" in [0,1] or arbitrary;
     # map with Hill to transmitter effectiveness:
-    preE = hill01(glu_in, params.K_preE, params.n_preE)
-    preI = hill01(gly_in, params.K_preI, params.n_preI)
+    sE_inf = hill(glu_in, params.K_preE, params.n_preE)
+    sI_inf = hill(gly_in, params.K_preI, params.n_preI)
 
     # First-order synapse gating (conductance-based)
     # ds/dt = (s_inf(pre) - s)/tau
-    sE_inf = preE
-    sI_inf = preI
-    dsE = (sE_inf - sE) / params.tau_E
-    dsI = (sI_inf - sI) / params.tau_I
+    dsE = (params.a_preE * sE_inf - sE) / params.tau_E
+    dsI = (params.a_preI * sI_inf - sI) / params.tau_I
 
     # ----- intrinsic currents (HH) -----
     I_L  = params.g_L  * (V - params.E_L)
@@ -117,7 +116,7 @@ function ganglion_model!(du, u, p, t)
     I_I = params.g_I * sI * (V - params.E_I)   # Gly/GABA, E_I ~ -70 mV
 
     # ----- membrane equation -----
-    dV = (-I_L - I_Na - I_K - I_E - I_I) / params.C_m
+    dV = (-I_L - I_Na - I_K - I_E - I_I + params.I_app) / params.C_m
 
     # ----- gating dynamics -----
     αm, βm = alpha_beta_m(V)

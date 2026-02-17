@@ -1,5 +1,6 @@
 Key,Value,Description
 C_m,30.0,Membrane capacitance (pF)
+I_app,0.0,Applied current (pA)
 g_L,1.0,Leak conductance (nS)
 E_L,-55.0,Leak reversal potential (mV)
 
@@ -8,30 +9,32 @@ E_K,-85.0,Potassium reversal potential (mV)
 Vn_half,-30.0,Kv activation midpoint (mV)
 kn_slope,9.0,Kv activation slope (mV)
 tau_n,8.0,Kv activation time constant (ms)
+
 g_h,1.0,HCN (Ih) conductance (nS)
 E_h,-35.0,Ih reversal potential (mV)
 Vh_half,-80.0,Ih activation midpoint (mV)
 kh_slope,-8.0,Ih activation slope (negative = opens on hyperpolarization)
 tau_h,80.0,Ih activation time constant (ms)
+
 g_CaL,0.8,L-type Ca conductance (nS)
 E_Ca,60.0,Calcium reversal potential (mV, effective)
 Vm_half,-35.0,CaL activation midpoint (mV)
 km_slope,7.0,CaL activation slope (mV)
 tau_m,3.0,CaL activation time constant (ms)
-tau_c,40.0,Intracellular Ca pool decay time constant (ms)
-k_c,0.005,Ca influx to pool scaling factor
+tau_c,2.0,Intracellular Ca pool decay time constant (ms)
+k_c,0.01,Ca influx to pool scaling factor
 g_KCa,1.5,Ca-activated K conductance (nS)
 K_c,0.5,Ca half-activation for KCa channel
 n_c,2.0,Hill coefficient for Ca-activated K
 
 K_Glu,0.50,Glutamate half-activation for mGluR6 cascade (same units as input)
-n_Glu,20.0,Hill coefficient for glutamate-mGluR6 coupling
+n_Glu,5.0,Hill coefficient for glutamate-mGluR6 coupling
 a_S, 0.5, Glutamate-mGluR6 coupling scaling factor
 tau_S,50.0,mGluR6 cascade time constant (ms)
-g_TRPM1,3.0,TRPM1 nonselective cation conductance (nS)
+g_TRPM1,5.0,TRPM1 nonselective cation conductance (nS)
 E_TRPM1,0.0,TRPM1 reversal potential (mV)
 
-K_Release,0.6,Glutamate release half-activation (µM)
-n_Release,3.0,Hill coefficient for glutamate release
-a_Release,0.60,Glutamate release scaling factor
+K_Release,0.4,Glutamate release half-activation (µM)
+n_Release,4.0,Hill coefficient for glutamate release
+a_Release,2.0,Glutamate release scaling factor
 tau_Release,5.0,Glutamate release time constant (ms)

@@ -1,5 +1,6 @@
 Key,Value,Description
 tau_RPE,3000.0,Membrane time constant (ms)
+I_app,0.0,Applied current (pA)
 g_K_apical,5.0,Apical K+ conductance (nS)
 g_Cl_baso,2.0,Basal Cl- conductance (nS)
 g_L_RPE,0.5,Leak conductance (nS)

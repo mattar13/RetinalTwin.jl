@@ -1,5 +1,5 @@
 Key,Value,LowerBounds,UpperBounds,Description
-aC,0.001,0,1,0.001
+aC,0.01,0,1,0.001
 kR1,400,0,500,400
 kF1,10,0,1,10
 kR2,100,0,100,100
@@ -14,6 +14,7 @@ T_tot,0.3,0,1,Total T* concentration (mM)
 P_tot,0.021,0,1,Total P* concentration (mM)
 lambda,0.67,0,1,Quantum efficiency
 C_m,0.02,0,500,0.02
+I_app,0.0,-10000,10000,Applied current (pA)
 gLEAK,0.5,0,20,Leak conductance (nS)
 ELEAK,77,0,100,Leak reversal potential (mV)
 gH,3,0,10,3
@@ -59,6 +60,7 @@ tM,841.4981132,50,1000,tM (m²)
 tC,35903.10138,20000,40000,tC (m²)
 tO,80.05777856,0,500,tO (m²)
 alpha_Glu,1.0,0,10,alpha_Glu (µM)
-V_Glu_half,-40.0,-50,-30,V_Glu_half (mV)
-V_Glu_slope,5.0,1,10,V_Glu_slope (mV)
-tau_Glu,10.0,1,50,tau_Glu (ms)
+V_Glu_half,-45.0,-50,-30,V_Glu_half (mV)
+V_Glu_slope,1.5,1,10,V_Glu_slope (mV)
+a_Glu,0.80,0,10,a_Glu (µM)
+tau_Glu,40.0,1,50,tau_Glu (ms)

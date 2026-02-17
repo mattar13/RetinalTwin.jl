@@ -119,7 +119,7 @@ function a2_model!(du, u, p, t)
     I_KCa = params.g_KCa * a_c * (V - params.E_K)
 
     # -------- voltage derivative --------
-    dV = (-I_L - I_iGluR - I_Kv - I_h - I_CaL - I_KCa) / params.C_m
+    dV = (-I_L - I_iGluR - I_Kv - I_h - I_CaL - I_KCa + params.I_app) / params.C_m
 
     # -------- output glutamate release proxy (Ca-driven) --------
     dY = (params.a_Release * R_inf(c, params.K_Release, params.n_Release) - Y) / params.tau_Release

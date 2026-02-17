@@ -106,7 +106,8 @@ function rpe_model!(du, u, p, t)
     E_K_sub = nernst_K(K_sub, K_i)
     dV_RPE = (-g_K_apical * (V_RPE - E_K_sub) -
               g_Cl_baso * (V_RPE - E_Cl) -
-              g_L_RPE * (V_RPE - E_L_RPE)) / tau_RPE
+              g_L_RPE * (V_RPE - E_L_RPE) +
+              params.I_app) / tau_RPE
 
     # Assign derivatives
     du .= [dV_RPE, dK_sub]

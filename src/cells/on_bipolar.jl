@@ -110,7 +110,7 @@ function on_bipolar_model!(du, u, p, t)
     I_KCa = params.g_KCa * a_c * (V - params.E_K)
 
     # -------- voltage derivative --------
-    dV = (-I_L - I_TRPM1 - I_Kv - I_h - I_CaL - I_KCa) / params.C_m
+    dV = (-I_L - I_TRPM1 - I_Kv - I_h - I_CaL - I_KCa + params.I_app) / params.C_m
     
     # -------- glutamate release --------
     dG = (params.a_Release * R_inf(c, params.K_Release, params.n_Release) - G) / params.tau_Release # dG/dt = (a_Release * R_inf(Ca, K_Release, n_Release) - G) / tau_Release

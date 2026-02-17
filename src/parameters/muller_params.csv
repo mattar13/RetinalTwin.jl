@@ -1,5 +1,6 @@
 Key,Value,Description
 C_m,30.0,Membrane capacitance (pF)
+I_app,0.0,Applied current (pA)
 g_Kir_end,5.0,Endfoot Kir conductance (nS)
 g_Kir_stalk,2.0,Stalk Kir conductance (nS)
 K_o_rest,3.0,Resting extracellular K+ (mM)

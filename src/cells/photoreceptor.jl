@@ -38,10 +38,7 @@ function photoreceptor_state(params)
     V0 = -36.186
 
     # Glutamate release (compute from dark voltage)
-    V_Glu_half = params.V_Glu_half
-    V_Glu_slope = params.V_Glu_slope
-    alpha_Glu = params.alpha_Glu
-    Glu0 = alpha_Glu / (1.0 + exp(-(V0 - V_Glu_half) / V_Glu_slope))
+    Glu0 = R_glu_inf(V0, params)
 
     return [R0, T0, P0, G0, HC10, HC20, HO10, HO20, HO30, mKv0, hKv0, mCa0, mKCa0, Ca_s0, Ca_f0, CaB_ls0, CaB_hs0, CaB_lf0, CaB_hf0, V0, Glu0]
 end
@@ -91,6 +88,9 @@ Ca exchanger saturation function (clamped at 0).
 # Hyperpolarization-activated current (Ih) rate functions
 @inline αh(v) = 8 / (exp((v + 78)/14) + 1)
 @inline βh(v) = 18 / (exp(-(v + 8)/19) + 1)
+
+# Glutamate release steady-state function (voltage-dependent)
+@inline R_glu_inf(V, params) = params.alpha_Glu / (1.0 + exp(-(V - params.V_Glu_half) / params.V_Glu_slope))
 
 """
     hT(v)
@@ -202,11 +202,11 @@ function photoreceptor_model!(du, u, p, t)
     dCaB_hf = params.Hb1 * Ca_f * (params.Bh - CaB_hf) - params.Hb2 * CaB_hf
 
     # ── Voltage ──
-    dV = -(iPHOTO + iLEAK + iH + iCa + iCl + iKCa + iKV + iEX + iEX2) / params.C_m
+    dV = (-(iPHOTO + iLEAK + iH + iCa + iCl + iKCa + iKV + iEX + iEX2) + params.I_app) / params.C_m
 
     # ── Glutamate release dynamics (voltage-dependent) ──
-    R_glu_inf = params.alpha_Glu / (1.0 + exp(-(V - params.V_Glu_half) / params.V_Glu_slope))
-    dGlu = (R_glu_inf - Glu) / params.tau_Glu
+    r_glu_inf = R_glu_inf(V, params)
+    dGlu = (params.a_Glu * r_glu_inf - Glu) / params.tau_Glu
 
     # ── Assign all derivatives to du ──
     du .= [dR, dT, dP, dG, dHC1, dHC2, dHO1, dHO2, dHO3,

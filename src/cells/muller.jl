@@ -126,7 +126,7 @@ function muller_model!(du, u, p, t)
     J_uptake = V_max_EAAT * Glu_o_clamped / (K_m_EAAT + Glu_o_clamped)
 
     # Derivatives
-    dV_M = (-I_Kir_end - I_Kir_stalk) / C_m
+    dV_M = (-I_Kir_end - I_Kir_stalk + params.I_app) / C_m
 
     dK_o_end = alpha_K * I_K_neural * 0.3 -  # 30% of neural K+ at endfoot
                K_uptake_end * 0.01 -
