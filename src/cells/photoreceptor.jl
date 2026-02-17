@@ -43,6 +43,32 @@ function photoreceptor_state(params)
     return [R0, T0, P0, G0, HC10, HC20, HO10, HO20, HO30, mKv0, hKv0, mCa0, mKCa0, Ca_s0, Ca_f0, CaB_ls0, CaB_hs0, CaB_lf0, CaB_hf0, V0, Glu0]
 end
 
+#The initial conditions are pretty long so here is a map of the value and it's index
+const PC_IC_MAP = (
+    R = 1, 
+    T = 2, 
+    P = 3, 
+    G = 4, 
+    HC1 = 5, 
+    HC2 = 6, 
+    HO1 = 7, 
+    HO2 = 8, 
+    HO3 = 9, 
+    mKv = 10, 
+    hKv = 11, 
+    mCa = 12, 
+    mKCa = 13, 
+    Ca_s = 14, 
+    Ca_f = 15, 
+    CaB_ls = 16, 
+    CaB_hs = 17, 
+    CaB_lf = 18, 
+    CaB_hf = 19, 
+    V = 20, 
+    Glu = 21
+)
+
+n_PC_STATES = length(PC_IC_MAP)
 # ── 3. Auxiliary Functions ──────────────────────────────────
 
 """
@@ -220,22 +246,17 @@ end
 """
     photoreceptor_K_current(u, params)
 
-Compute total K+ current from a rod photoreceptor for Müller/RPE K+ sensing.
+Compute total K+ efflux from a rod photoreceptor.
 """
-function photoreceptor_K_current(u, params::NamedTuple)
-    V = u[ROD_V_INDEX]
-    mKv = u[ROD_MKV_INDEX]
-    hKv = u[ROD_HKV_INDEX]
-    mKCa = u[ROD_MKCA_INDEX]
-    Ca_s = u[ROD_CA_S_INDEX]
-
-    eK = params.eK
-    gKV = params.gKV
-    gKCa = params.gKCa
-
-    E_K = -eK
-    IKv = gKV * mKv^3 * hKv * (V - E_K)
-    IKCa = gKCa * mKCa^2 * mKCas(Ca_s) * (V - E_K)
+function photoreceptor_K_efflux(u, params::NamedTuple)
+    V = u[PC_IC_MAP.V]
+    mKv = u[PC_IC_MAP.mKv]
+    hKv = u[PC_IC_MAP.hKv]
+    mKCa = u[PC_IC_MAP.mKCa]
+    Ca_s = u[PC_IC_MAP.Ca_s]
+    E_K = -params.eK
+    IKv = params.gKV * mKv^3 * hKv * (V - E_K)
+    IKCa = params.gKCa * mKCa^2 * mKCas(Ca_s) * (V - E_K)
 
     return IKv + IKCa
 end

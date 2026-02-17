@@ -5,17 +5,17 @@
 # ── 2. Initial Conditions ───────────────────────────────────
 
 """
-    a2_dark_state(params)
+    a2_amacrine_state(params)
 
 Return dark-adapted initial conditions for an A2 amacrine cell.
 
 # Arguments
-- `params`: named tuple from `default_a2_params()`
+- `params`: named tuple from `default_a2_amacrine_params()`
 
 # Returns
 - 7-element state vector [V, n, h, c, A, D, Y]
 """
-function a2_state(params)
+function a2_amacrine_state(params)
     V0 = -60.0
     n0 = gate_inf(V0, params.Vn_half, params.kn_slope)
     h0 = gate_inf(V0, params.Vh_half, params.kh_slope)
@@ -26,6 +26,17 @@ function a2_state(params)
     return [V0, n0, h0, c0, A0, D0, Y0]
 end
 
+const A2_IC_MAP = (
+    V = 1, 
+    n = 2, 
+    h = 3, 
+    c = 4, 
+    A = 5, 
+    D = 6, 
+    Y = 7
+)
+
+n_A2_STATES = length(A2_IC_MAP)
 # ── 3. Auxiliary Functions ──────────────────────────────────
 
 #Defined in off_bipolar.jl
@@ -126,4 +137,12 @@ function a2_model!(du, u, p, t)
 
     du .= (dV, dn, dh, dc, dA, dD, dY)
     return nothing
+end
+
+function a2_amacrine_K_efflux(u, params)
+    V = u[A2_IC_MAP.V]
+    n = u[A2_IC_MAP.n]
+    EK = params.E_K
+    IKv  = params.g_Kv * n * (V - EK)
+    return IKv
 end

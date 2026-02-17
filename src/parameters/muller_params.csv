@@ -1,11 +1,28 @@
-Key,Value,Description
-C_m,30.0,Membrane capacitance (pF)
-I_app,0.0,Applied current (pA)
-g_Kir_end,5.0,Endfoot Kir conductance (nS)
-g_Kir_stalk,2.0,Stalk Kir conductance (nS)
-K_o_rest,3.0,Resting extracellular K+ (mM)
-K_i,140.0,Intracellular K+ (mM)
-tau_K_diffusion,200.0,K+ clearance time constant (ms)
-alpha_K,0.001,K+ release per unit current
-V_max_EAAT,0.5,Max glutamate uptake rate (µM/ms)
-K_m_EAAT,10.0,Glutamate uptake Km (µM)
+Key,Value,LowerBound,UpperBound,Description
+
+C_m,60.0,10.0,200.0,Müller membrane capacitance (pF; large cell)
+g_L,0.2,0.0,2.0,Leak conductance (nS; small compared to Kir)
+E_L,-65.0,-90.0,-50.0,Leak reversal potential (mV)
+I_app,0.0,-100.0,100.0,Applied current (pA; usually zero)
+
+K_i,140.0,120.0,160.0,Intracellular K+ concentration (mM)
+
+K_o_rest,3.0,2.0,5.0,Resting extracellular K+ (mM)
+
+g_Kir_end,40.0,5.0,200.0,Kir conductance at endfoot (nS)
+g_Kir_stalk,60.0,5.0,300.0,Kir conductance at stalk (nS)
+
+Kir_Vshift,15.0,5.0,30.0,Voltage shift for Kir rectification (mV above EK)
+Kir_k,6.0,2.0,15.0,Kir rectification slope (mV)
+
+alpha_K,0.0002,0.0,0.01,Scaling from neuronal K current (pA) to ECS K source
+beta_K,0.001,0.0,0.01,Scaling from Kir current (pA) to ECS K uptake
+frac_end,0.3,0.0,1.0,Fraction of neuronal K source to endfoot
+frac_stalk,0.7,0.0,1.0,Fraction of neuronal K source to stalk
+tau_K_diffusion,200.0,20.0,2000.0,Time constant for ECS K relaxation (ms)
+
+V_max_EAAT,0.8,0.0,10.0,Maximum glutamate uptake rate (µM/ms or proxy units)
+K_m_EAAT,10.0,0.1,100.0,EAAT half-saturation constant (µM or proxy)
+g_EAAT,0.001,0.0,0.01,EAAT conductance (nS)
+
+dt_guard,0.1,0.001,1.0,Time step guard for log-domain safety (ms)

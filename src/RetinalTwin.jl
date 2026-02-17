@@ -16,25 +16,25 @@ export
 
 # --- Cell update functions ---
 include("cells/photoreceptor.jl")
-export rod_dark_state, photoreceptor_model!
+export photoreceptor_state, photoreceptor_model!, photoreceptor_K_efflux
 include("cells/horizontal.jl")
-export horizontal_dark_state, horizontal_model!
+export horizontal_state, horizontal_model!
 include("cells/on_bipolar.jl")
-export on_bipolar_dark_state, on_bipolar_model!
+export on_bipolar_state, on_bipolar_model!, on_bipolar_K_efflux
 include("cells/off_bipolar.jl")
-export off_bipolar_dark_state, off_bipolar_model!
+export off_bipolar_state, off_bipolar_model!, off_bipolar_K_efflux
 include("cells/a2_amacrine.jl")
-export a2_dark_state, a2_model!
+export a2_amacrine_state, a2_amacrine_model!, a2_amacrine_K_efflux
 include("cells/gaba_amacrine.jl")
-export gaba_amacrine_dark_state, gaba_amacrine_model!
+export gaba_amacrine_state, gaba_amacrine_model!
 include("cells/da_amacrine.jl")
-export da_amacrine_dark_state, da_amacrine_model!
+export da_amacrine_state, da_amacrine_model!
 include("cells/ganglion.jl")
-export ganglion_dark_state, ganglion_model!
+export ganglion_state, ganglion_model!, ganglion_K_efflux
 include("cells/muller.jl")
-export muller_dark_state, muller_model!
+export muller_state, muller_model!
 include("cells/rpe.jl")
-export rpe_dark_state, rpe_model!
+export rpe_state, rpe_model!
 
 # --- Circuit wiring ---
 include("circuit/retinal_column.jl")

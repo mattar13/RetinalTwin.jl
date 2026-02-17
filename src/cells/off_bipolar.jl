@@ -5,7 +5,7 @@
 # ── 2. Initial Conditions ───────────────────────────────────
 
 """
-    offbc_state(params)
+    off_bipolar_state(params)
 
 Return dark-adapted initial conditions for an OFF bipolar cell.
 
@@ -15,7 +15,7 @@ Return dark-adapted initial conditions for an OFF bipolar cell.
 # Returns
 - 7-element state vector [V, n, h, c, A, D, G]
 """
-function offbc_state(params)
+function off_bipolar_state(params)
     V0 = -60.0
     n0 = gate_inf(V0, params.Vn_half, params.kn_slope)
     h0 = gate_inf(V0, params.Vh_half, params.kh_slope)
@@ -26,6 +26,17 @@ function offbc_state(params)
     return [V0, n0, h0, c0, A0, D0, G0]
 end
 
+const OFFBC_IC_MAP = (
+    V = 1, 
+    n = 2, 
+    h = 3, 
+    c = 4, 
+    A = 5, 
+    D = 6, 
+    Glu = 7
+)
+
+n_OFFBC_STATES = length(OFFBC_IC_MAP)
 # ── 3. Auxiliary Functions ──────────────────────────────────
 
 #This function is already defined in on_bipolar.jl
@@ -136,4 +147,13 @@ function off_bipolar_model!(du, u, p, t)
 
     du .= (dV, dn, dh, dc, dA, dD, dG)
     return nothing
+end
+
+
+function off_bipolar_K_efflux(u, params)
+    V = u[OFFBC_IC_MAP.V]
+    n = u[OFFBC_IC_MAP.n]
+    EK = params.E_K
+    IKv  = params.g_Kv * n * (V - EK)
+    return IKv
 end

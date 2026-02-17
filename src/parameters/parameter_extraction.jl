@@ -74,7 +74,7 @@ end
 
 Load default A2 amacrine cell parameters from the bundled CSV file.
 """
-function default_a2_params()
+function default_a2_amacrine_params()
     csv_path = joinpath(@__DIR__, "a2_amacrine_params.csv")
     return load_params_from_csv(csv_path)
 end

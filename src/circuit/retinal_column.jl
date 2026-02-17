@@ -2,6 +2,43 @@
 # retinal_column.jl — Retinal column model with direct coupling
 # ============================================================
 
+#We are working on a more complex mapping model that will add some convienance
+struct CellRef
+    name::Symbol
+    cell_type::Symbol
+    offset::Int
+    nstate::Int
+    outidx::Dict{Symbol,Int}
+end
+
+function CellRef(cell_type::Symbol, num::Int, offset::Int)
+    if cell_type == :PC
+        Symbol(cell_ty)
+        return CellRef(name, cell_type, offset, n_PC_STATES, Dict{Symbol,Int}())
+    elseif cell_type == :ONBC
+        return CellRef(name, cell_type, offset, n_ONBC_STATES, Dict{Symbol,Int}())
+    elseif cell_type == :OFFBC
+        return CellRef(name, cell_type, offset, n_OFFBC_STATES, Dict{Symbol,Int}())
+    elseif cell_type == :A2
+        return CellRef(name, cell_type, offset, n_A2_STATES, Dict{Symbol,Int}())
+    elseif cell_type == :GC
+        return CellRef(name, cell_type, offset, n_GC_STATES, Dict{Symbol,Int}())
+    elseif cell_type == :MG
+        return CellRef(name, cell_type, offset, n_MG_STATES, Dict{Symbol,Int}())
+    else
+        error("Invalid cell type: $cell_type")
+    end
+end
+
+CellRef()
+
+struct RetinalColumnModel
+
+
+
+end
+
+
 # ── State organization ──────────────────────────────────────
 
 DEFAULT_INDEXES = (
@@ -15,6 +52,8 @@ DEFAULT_INDEXES = (
     A2_ICS_ID_END = 41,
     GC_ICS_ID_BEGIN = 42,
     GC_ICS_ID_END = 47,
+    MULLER_ICS_ID_BEGIN = 48,
+    MULLER_ICS_ID_END = 51,
     #Next we can define the neurotransmitter indices
     PC_GLU_INDEX = 21,
     ONBC_GLU_INDEX = 6,
@@ -40,8 +79,9 @@ function default_retinal_params()
         PHOTORECEPTOR_PARAMS = default_rod_params(),
         ON_BIPOLAR_PARAMS = default_on_bc_params(),
         OFF_BIPOLAR_PARAMS = default_off_bc_params(),
-        A2_AMACRINE_PARAMS = default_a2_params(),
-        GANGLION_PARAMS = default_gc_params()
+        A2_AMACRINE_PARAMS = default_a2_amacrine_params(),
+        GANGLION_PARAMS = default_gc_params(), 
+        MULLER_PARAMS = default_muller_params()
     )
 end
 
@@ -56,7 +96,7 @@ Build initial conditions for photoreceptor + ON bipolar system.
 - `params`: NamedTuple from `default_retinal_params()`
 
 # Returns
-- 25-element state vector [photoreceptor(21), on_bipolar(6), off_bipolar(7), a2(7)]
+- 25-element state vector [photoreceptor(21), on_bipolar(6), off_bipolar(7), a2(7), ganglion(6), muller(4)]
 """
 function retinal_column_initial_conditions(params)
     # Get individual cell initial conditions
@@ -66,29 +106,34 @@ function retinal_column_initial_conditions(params)
     ic_size += length(u0_photoreceptor)
     println("IC size after photoreceptor: $ic_size")
 
-    u0_on_bipolar = onbc_state(params.ON_BIPOLAR_PARAMS)
+    u0_on_bipolar = on_bipolar_state(params.ON_BIPOLAR_PARAMS)
     println("Size of on bipolar state vector: $(length(u0_on_bipolar))")
     ic_size += length(u0_on_bipolar)
     println("IC size after on bipolar: $ic_size")
 
-    u0_off_bipolar = offbc_state(params.OFF_BIPOLAR_PARAMS)
+    u0_off_bipolar = off_bipolar_state(params.OFF_BIPOLAR_PARAMS)
     println("Size of off bipolar state vector: $(length(u0_off_bipolar))")
     ic_size += length(u0_off_bipolar)
     println("IC size after off bipolar: $ic_size")
 
-    u0_a2 = a2_state(params.A2_AMACRINE_PARAMS)
+    u0_a2 = a2_amacrine_state(params.A2_AMACRINE_PARAMS)
     println("Size of a2 state vector: $(length(u0_a2))")
     ic_size += length(u0_a2)
     println("IC size after a2: $ic_size")
 
-    u0_gc = ganglion_dark_state(params.GANGLION_PARAMS)
+    u0_gc = ganglion_state(params.GANGLION_PARAMS)
     println("Size of ganglion state vector: $(length(u0_gc))")
     ic_size += length(u0_gc)
     println("IC size after ganglion: $ic_size")
 
+    u0_muller = muller_state(params.MULLER_PARAMS)
+    println("Size of muller state vector: $(length(u0_muller))")
+    ic_size += length(u0_muller)
+    println("IC size after muller: $ic_size")
+
     println("Total size of initial condition vector: $ic_size")
     # Concatenate into single state vector
-    return vcat(u0_photoreceptor, u0_on_bipolar, u0_off_bipolar, u0_a2, u0_gc)
+    return vcat(u0_photoreceptor, u0_on_bipolar, u0_off_bipolar, u0_a2, u0_gc, u0_muller)
 end
 
 # ── Auxillary Functions ─────────────────────────────────────
@@ -141,12 +186,14 @@ function retinal_column_model!(du, u, p, t)
     u_off_bipolar = @view u[idxs.OFFBC_ICS_ID_BEGIN:idxs.OFFBC_ICS_ID_END]
     u_a2 = @view u[idxs.A2_ICS_ID_BEGIN:idxs.A2_ICS_ID_END]
     u_gc = @view u[idxs.GC_ICS_ID_BEGIN:idxs.GC_ICS_ID_END]
+    u_muller = @view u[idxs.MULLER_ICS_ID_BEGIN:idxs.MULLER_ICS_ID_END]
 
     du_photoreceptor = @view du[idxs.PC_ICS_ID_BEGIN:idxs.PC_ICS_ID_END]
     du_on_bipolar = @view du[idxs.ONBC_ICS_ID_BEGIN:idxs.ONBC_ICS_ID_END]
     du_off_bipolar = @view du[idxs.OFFBC_ICS_ID_BEGIN:idxs.OFFBC_ICS_ID_END]
     du_a2 = @view du[idxs.A2_ICS_ID_BEGIN:idxs.A2_ICS_ID_END]
     du_gc = @view du[idxs.GC_ICS_ID_BEGIN:idxs.GC_ICS_ID_END]
+    du_muller = @view du[idxs.MULLER_ICS_ID_BEGIN:idxs.MULLER_ICS_ID_END]
     # === Neurotransmitter coupling ===
 
     # Get glutamate release from photoreceptor state
@@ -176,5 +223,17 @@ function retinal_column_model!(du, u, p, t)
     #Electrical coupling between cells
     gap_junction_coupling(du_a2[1], u_a2[1], du_on_bipolar[1], u_on_bipolar[1], params.A2_AMACRINE_PARAMS.C_m, params.ON_BIPOLAR_PARAMS.C_m, params.A2_AMACRINE_PARAMS.g_gap)
 
+    #Model the efflux of K+ from all cells
+    K_photo_efflux = photoreceptor_K_efflux(u_photoreceptor, params.PHOTORECEPTOR_PARAMS)
+    K_onbc_efflux = on_bipolar_K_efflux(u_on_bipolar, params.ON_BIPOLAR_PARAMS)
+    K_offbc_efflux = off_bipolar_K_efflux(u_off_bipolar, params.OFF_BIPOLAR_PARAMS)
+    K_a2_efflux = a2_amacrine_K_efflux(u_a2, params.A2_AMACRINE_PARAMS)
+    K_gc_efflux = ganglion_K_efflux(u_gc, params.GANGLION_PARAMS)
+    # outward-only already returned by helpers
+    I_K_src_stalk = K_photo_efflux + K_onbc_efflux + K_offbc_efflux + K_a2_efflux + K_gc_efflux
+
+    # endfoot is a "sink-adjacent" pool; give it a smaller mixed source
+    I_K_src_end = 0.2 * (K_a2_efflux + K_gc_efflux) + 0.1 * K_onbc_efflux
+    muller_model!(du_muller, u_muller, (params.MULLER_PARAMS, I_K_src_end, I_K_src_stalk, glu_gc_exc), t)
     return nothing
 end

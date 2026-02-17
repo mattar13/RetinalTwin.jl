@@ -22,7 +22,7 @@ Vm_half,-35.0,CaL activation midpoint (mV)
 km_slope,7.0,CaL activation slope (mV)
 tau_m,3.0,CaL activation time constant (ms)
 tau_c,2.0,Intracellular Ca pool decay time constant (ms)
-k_c,0.01,Ca influx to pool scaling factor
+k_c,0.008,Ca influx to pool scaling factor
 g_KCa,1.5,Ca-activated K conductance (nS)
 K_c,0.5,Ca half-activation for KCa channel
 n_c,2.0,Hill coefficient for Ca-activated K

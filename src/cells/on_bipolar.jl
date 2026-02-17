@@ -15,7 +15,7 @@ Return dark-adapted initial conditions for an ON bipolar cell.
 # Returns
 - 6-element state vector [V, w, S_mGluR6, Glu_release, Ca, Glu]
 """
-function onbc_state(params)
+function on_bipolar_state(params)
     V0 = -60.0
     n0 = gate_inf(V0, params.Vn_half, params.kn_slope)
     h0 = gate_inf(V0, params.Vh_half, params.kh_slope)
@@ -25,6 +25,16 @@ function onbc_state(params)
     return [V0, n0, h0, c0, S0, Glu0]
 end
 
+const ONBC_IC_MAP = (
+    V = 1, 
+    n = 2, 
+    h = 3, 
+    c = 4, 
+    S = 5, 
+    Glu = 6
+)
+
+n_ONBC_STATES = length(ONBC_IC_MAP)
 # ── 3. Auxiliary Functions ──────────────────────────────────
 
 @inline σ(x) = 1.0 / (1.0 + exp(-x))
@@ -102,6 +112,7 @@ function on_bipolar_model!(du, u, p, t)
 
     #-------- Ca pool --------
     # driven by inward Ca current only (when I_CaL is negative)
+    # I_CaL_DARK = 10.0 #This is kind of a rectifier
     Ca_in = max(-I_CaL, 0.0)
     dc = (-c / params.tau_c) + params.k_c * Ca_in
 
@@ -116,4 +127,13 @@ function on_bipolar_model!(du, u, p, t)
     dG = (params.a_Release * R_inf(c, params.K_Release, params.n_Release) - G) / params.tau_Release # dG/dt = (a_Release * R_inf(Ca, K_Release, n_Release) - G) / tau_Release
     du .= (dV, dn, dh, dc, dS, dG)
     return nothing
+end
+
+
+function on_bipolar_K_efflux(u, params)
+    V = u[ONBC_IC_MAP.V]
+    n = u[ONBC_IC_MAP.n]
+    EK = params.E_K
+    IKv  = params.g_Kv * n * (V - EK)
+    return IKv
 end

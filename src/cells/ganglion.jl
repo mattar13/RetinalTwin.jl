@@ -5,7 +5,7 @@
 # ── 2. Initial Conditions ───────────────────────────────────
 
 """
-    ganglion_dark_state(params)
+    ganglion_state(params)
 
 Return dark-adapted initial conditions for a ganglion cell.
 
@@ -15,7 +15,7 @@ Return dark-adapted initial conditions for a ganglion cell.
 # Returns
 - 6-element state vector [V, m, h, n, sE, sI]
 """
-function ganglion_dark_state(params)
+function ganglion_state(params)
     V0 = -60.0
     αm, βm = alpha_beta_m(V0)
     αh, βh = alpha_beta_h(V0)
@@ -27,6 +27,17 @@ function ganglion_dark_state(params)
     sI0 = 0.0
     return [V0, m0, h0, n0, sE0, sI0]
 end
+
+const GC_IC_MAP = (
+    V = 1, 
+    m = 2, 
+    h = 3, 
+    n = 4, 
+    sE = 5, 
+    sI = 6
+)
+
+n_GC_STATES = length(GC_IC_MAP)
 # ── 3. Auxiliary Functions ──────────────────────────────────
 
 # Use shared ML functions from horizontal.jl
@@ -129,4 +140,12 @@ function ganglion_model!(du, u, p, t)
 
     du .= (dV, dm, dh, dn, dsE, dsI)
     return nothing
+end
+
+function ganglion_K_efflux(u, params)
+    V = u[GC_IC_MAP.V]
+    n = u[GC_IC_MAP.n]
+    EK = params.E_K
+    IKv  = params.g_K * (n^4) * (V - EK)
+    return IKv
 end

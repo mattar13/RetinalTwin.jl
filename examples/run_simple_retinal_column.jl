@@ -34,9 +34,9 @@ prob = ODEProblem(retinal_column_model!, u0, tspan, (params, stim_func_dark))
 sol = solve(prob, Rodas5(); save_everystep=false, save_start=false,save_end=true, abstol=1e-6, reltol=1e-4)
 u0 = sol.u[end]
 
-stim_start = 50.0   # ms
-stim_end = 550.0      # ms (5 ms flash)
-photon_flux = 100.0  # photons/µm²/ms
+stim_start = 80.0   # ms
+stim_end = 180.0      # ms (5 ms flash)
+photon_flux = 50.0  # photons/µm²/ms
 stim_func(t) = RetinalTwin.single_flash(t; stim_start = stim_start, stim_end = stim_end, photon_flux = photon_flux)
 println("\n4. Stimulus configuration:")
 println("  ✓ Intensity: $(photon_flux) ph/µm²/ms")
@@ -45,11 +45,10 @@ println("  ✓ Duration: $(stim_start) - $(stim_end) ms")
 # ── 4. Solve ODE system ───────────────────────────────────────
 println("\n5. Solving coupled system...")
 
-tspan = (0.0, 2000.0)  # ms
+tspan = (0.0, 1000.0)  # ms
 prob = ODEProblem(retinal_column_model!, u0, tspan, (params, stim_func))
 
 sol = solve(prob, Rodas5(); tstops = [stim_start, stim_end], saveat=1.0, abstol=1e-6, reltol=1e-4)
-
 println("  ✓ Solver status: $(sol.retcode)")
 println("  ✓ Time points: $(length(sol.t))")
 
@@ -57,7 +56,7 @@ println("  ✓ Time points: $(length(sol.t))")
 println("\n6. Extracting results...")
 
 t = sol.t
-t_series = range(0.0, sol.t[end], length=1000)
+t_series = range(0.0, sol.t[end], length=10000)
 
 # Photoreceptor variables
 V_photo = map(t-> sol(t)[20], t_series)
@@ -84,15 +83,20 @@ Ca_gc = map(t-> sol(t)[46], t_series)  # Ganglion Ca proxy (sE)
 gE_gc = map(t-> sol(t)[46], t_series)  # Ganglion excitatory gate
 gI_gc = map(t-> sol(t)[47], t_series)  # Ganglion inhibitory gate
 
+# Muller glia variables (expected as 4 states appended after ganglion).
+V_muller = map(t-> sol(t)[48], t_series)  # Muller glia V
+K_end_muller = map(t-> sol(t)[49], t_series)  # Muller glia K_o end
+Glu_muller = map(t-> sol(t)[51], t_series)  # Muller glia glutamate release
+
 #%% ── 6. Visualization ──────────────────────────────────────────
 println("\n7. Creating plots...")
 
 fig1 = Figure(size=(1400, 1200))
 
-row_labels = ["Photoreceptor", "ON Bipolar", "Ganglion", "OFF Bipolar", "A2 Amacrine"]
-voltage_data = [V_photo, V_onbc, V_gc, V_offbc, V_a2]
-calcium_data = [Ca_photo, Ca_onbc, Ca_gc, Ca_offbc, Ca_a2]
-release_data = [Glu_photo, Glu_onbc, nothing, Glu_offbc, Gly_a2]
+row_labels = ["Photoreceptor", "ON Bipolar", "Ganglion", "Muller Glia"]
+voltage_data = [V_photo, V_onbc, V_gc, V_muller]
+calcium_data = [Ca_photo, Ca_onbc, Ca_gc, K_end_muller]
+release_data = [Glu_photo, Glu_onbc, nothing, Glu_muller]
 
 voltage_axes = Axis[]
 calcium_axes = Axis[]
@@ -118,8 +122,9 @@ for i in eachindex(row_labels)
         xlabel=i == length(row_labels) ? "Time (ms)" : "",
         ylabel="Ca (µM)",
     )
+    row_labels[i] == "Muller Glia" && (ax_ca.ylabel = "K_o end (mM)")
     lines!(ax_ca, t_series, calcium_data[i], color=:purple, linewidth=2)
-    ylims!(ax_ca, 0.0, 1.0)
+#     ylims!(ax_ca, 0.0, 1.0)
     vlines!(ax_ca, [stim_start, stim_end], color=:gray, linestyle=:dash, alpha=0.5)
     i < length(row_labels) && hidexdecorations!(ax_ca, grid=false)
     push!(calcium_axes, ax_ca)
@@ -139,6 +144,7 @@ for i in eachindex(row_labels)
     else
         lines!(ax_rel, t_series, release_data[i], color=:green, linewidth=2)
     end
+    ylims!(ax_rel, 0.0, 1.0)
     vlines!(ax_rel, [stim_start, stim_end], color=:gray, linestyle=:dash, alpha=0.5)
     i < length(row_labels) && hidexdecorations!(ax_rel, grid=false)
     push!(release_axes, ax_rel)
@@ -334,14 +340,39 @@ vlines!(ax4a, [stim_start, stim_end],
 
 save("examples/plots/desensitization_off_bipolar_iGluR.png", fig3)
 
+# OFF pathway overview (OFF bipolar + A2 amacrine)
+fig_off = Figure(size=(900, 900))
+off_series = [
+    ("OFF Bipolar V", V_offbc, "V (mV)", :black),
+    ("OFF Bipolar Glu Release", Glu_offbc, "Glu (a.u.)", :orange),
+    ("A2 Amacrine V", V_a2, "V (mV)", :purple),
+    ("A2 Amacrine Gly Release", Gly_a2, "Gly (a.u.)", :red),
+]
+
+off_axes = Axis[]
+for (i, (name, y, ylabel_txt, color)) in enumerate(off_series)
+    ax = Axis(
+        fig_off[i, 1],
+        title=name,
+        xlabel=i == length(off_series) ? "Time (ms)" : "",
+        ylabel=ylabel_txt,
+    )
+    lines!(ax, t_series, y, color=color, linewidth=2)
+    vlines!(ax, [stim_start, stim_end], color=:gray, linestyle=:dash, alpha=0.5)
+    i < length(off_series) && hidexdecorations!(ax, grid=false)
+    push!(off_axes, ax)
+end
+
+linkxaxes!(off_axes...)
+save("examples/plots/off_pathway_overview.png", fig_off)
+
 #%% Plot all voltages in a single figure
 fig4 = Figure(size=(900, 1300))
 voltage_series = [
     ("Photoreceptor", V_photo, :blue),
     ("ON Bipolar", V_onbc, :green),
-    ("OFF Bipolar", V_offbc, :black),
-    ("A2 Amacrine", V_a2, :purple),
     ("Ganglion", V_gc, :red),
+    ("Muller Glia", V_muller, :brown),
 ]
 
 axes = Axis[]
