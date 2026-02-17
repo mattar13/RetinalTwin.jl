@@ -1,6 +1,7 @@
 # ============================================================
 # field_potential.jl — ERG computation and OP extraction
 # Spec §5, §7.7, Appendix B
+# This will be a major rework of course...
 # ============================================================
 
 using DSP
