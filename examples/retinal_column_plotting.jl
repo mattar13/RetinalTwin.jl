@@ -181,6 +181,10 @@ function plot_cell_layout_3d(
     z_pc::Real=1.0,
     z_bc::Real=2.0,
     z_gc::Real=3.0,
+    stimulus_func=nothing,
+    stimulus_time::Real=0.0,
+    stimulus_grid_n::Int=41,
+    z_stim::Real=0.0,
 )
     names = ordered_cells(model)
     pc_names = [nm for nm in names if model.cells[nm].cell_type == :PC]
@@ -193,6 +197,8 @@ function plot_cell_layout_3d(
     xhi = isempty(pc_x) ? 1.0 : maximum(pc_x)
     ylo = isempty(pc_y) ? 1.0 : minimum(pc_y)
     yhi = isempty(pc_y) ? 1.0 : maximum(pc_y)
+    xlo == xhi && (xlo -= 0.5; xhi += 0.5)
+    ylo == yhi && (ylo -= 0.5; yhi += 0.5)
 
     bc_names = vcat(onbc_names, offbc_names)
     bc_x, bc_y = _coords_for_names(model, bc_names; xbounds=(xlo, xhi), ybounds=(ylo, yhi))
@@ -228,6 +234,27 @@ function plot_cell_layout_3d(
         azimuth=0.8,
         elevation=0.35,
     )
+
+    if stimulus_func !== nothing
+        ngrid = max(2, Int(stimulus_grid_n))
+        xs = collect(range(xlo, xhi; length=ngrid))
+        ys = collect(range(ylo, yhi; length=ngrid))
+        z_plane = fill(Float64(z_stim), ngrid, ngrid)
+        stim_vals = Matrix{Float64}(undef, ngrid, ngrid)
+        for i in 1:ngrid, j in 1:ngrid
+            stim_vals[i, j] = Float64(stimulus_func(Float64(stimulus_time), xs[i], ys[j]))
+        end
+        surface!(
+            ax,
+            xs,
+            ys,
+            z_plane;
+            color=stim_vals,
+            colormap=:inferno,
+            shading=NoShading,
+            alpha=0.9,
+        )
+    end
 
     for (receiver, pres) in sort!(collect(model.connections), by=first)
         haskey(coord_by_name, receiver) || continue

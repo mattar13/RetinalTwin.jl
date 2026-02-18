@@ -56,6 +56,7 @@ export
 include("stimulus_protocols/single_flash.jl")
 include("stimulus_protocols/stimulus_protocols.jl")
 export single_flash, uniform_flash, spatial_stimulus
+export make_uniform_flash_stimulus, exponential_spot_stimulus, make_exponential_spot_stimulus
 
 # # --- ERG ---
 # include("erg/field_potential.jl")
