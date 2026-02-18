@@ -5,22 +5,24 @@ struct CellRef
     offset::Int
     nstate::Int
     outidx::NamedTuple
+    x::Float64
+    y::Float64
 end
 
-function CellRef(cell_type::Symbol, num::Int, offset::Int)
+function CellRef(cell_type::Symbol, num::Int, offset::Int; x::Real=NaN, y::Real=NaN)
     symbol = Symbol(cell_type, num)
     if cell_type == :PC
-        return CellRef(symbol, cell_type, offset, n_PC_STATES, PC_IC_MAP)
+        return CellRef(symbol, cell_type, offset, n_PC_STATES, PC_IC_MAP, Float64(x), Float64(y))
     elseif cell_type == :ONBC
-        return CellRef(symbol, cell_type, offset, n_ONBC_STATES, ONBC_IC_MAP)
+        return CellRef(symbol, cell_type, offset, n_ONBC_STATES, ONBC_IC_MAP, Float64(x), Float64(y))
     elseif cell_type == :OFFBC
-        return CellRef(symbol, cell_type, offset, n_OFFBC_STATES, OFFBC_IC_MAP)
+        return CellRef(symbol, cell_type, offset, n_OFFBC_STATES, OFFBC_IC_MAP, Float64(x), Float64(y))
     elseif cell_type == :A2
-        return CellRef(symbol, cell_type, offset, n_A2_STATES, A2_IC_MAP)
+        return CellRef(symbol, cell_type, offset, n_A2_STATES, A2_IC_MAP, Float64(x), Float64(y))
     elseif cell_type == :GC
-        return CellRef(symbol, cell_type, offset, n_GC_STATES, GC_IC_MAP)
+        return CellRef(symbol, cell_type, offset, n_GC_STATES, GC_IC_MAP, Float64(x), Float64(y))
     elseif cell_type == :MG
-        return CellRef(symbol, cell_type, offset, n_MG_STATES, MG_IC_MAP)
+        return CellRef(symbol, cell_type, offset, n_MG_STATES, MG_IC_MAP, Float64(x), Float64(y))
     else
         error("Invalid cell type: $cell_type")
     end
@@ -71,7 +73,23 @@ function connect!(model::RetinalColumnModel, receiver::Symbol, pres::Vector{Symb
     return model
 end
 
-function build_column(;nPC::Int=1, nONBC::Int=1, nOFFBC::Int=1, nA2::Int=1, nGC::Int=1, nMG::Int=1)
+function square_grid_coords(n::Int)
+    n < 0 && error("n must be non-negative, got $n")
+    nx = max(1, ceil(Int, sqrt(n)))
+    coords = Tuple{Float64,Float64}[]
+    sizehint!(coords, n)
+    for i in 1:n
+        col = mod(i - 1, nx)
+        row = div(i - 1, nx)
+        push!(coords, (col + 1.0, row + 1.0))
+    end
+    return coords
+end
+
+function build_column(;nPC::Int=1, nONBC::Int=1, nOFFBC::Int=1, nA2::Int=1, nGC::Int=1, nMG::Int=1, pc_coords=nothing)
+    if pc_coords !== nothing && length(pc_coords) != nPC
+        error("pc_coords length ($(length(pc_coords))) must equal nPC ($nPC)")
+    end
 
     params = default_retinal_params()
     cells = Dict{Symbol,CellRef}()
@@ -80,7 +98,8 @@ function build_column(;nPC::Int=1, nONBC::Int=1, nOFFBC::Int=1, nA2::Int=1, nGC:
 
     offset = 1
     for i in 1:nPC
-        cell = CellRef(:PC, i, offset)
+        x, y = pc_coords === nothing ? (Float64(i), 1.0) : (Float64(pc_coords[i][1]), Float64(pc_coords[i][2]))
+        cell = CellRef(:PC, i, offset; x=x, y=y)
         cells[cell.name] = cell
         push!(u0_parts, photoreceptor_state(params.PHOTORECEPTOR_PARAMS))
         offset += cell.nstate
