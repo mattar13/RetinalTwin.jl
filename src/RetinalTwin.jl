@@ -39,7 +39,7 @@ export rpe_state, rpe_model!
 #--- Circuit Mapping
 include("circuit/mapping.jl")   
 export CellRef, RetinalColumnModel, global_idx, display_global_idxs
-export cell_range, uview, duview, get_out, connect!, build_column
+export cell_range, uview, duview, get_out, connect!, square_grid_coords, build_column
 
 
 # --- Circuit wiring ---
@@ -54,7 +54,8 @@ export
 
 # --- Stimulus protocols ---
 include("stimulus_protocols/single_flash.jl")
-export single_flash
+include("stimulus_protocols/stimulus_protocols.jl")
+export single_flash, uniform_flash, spatial_stimulus
 
 # # --- ERG ---
 # include("erg/field_potential.jl")
