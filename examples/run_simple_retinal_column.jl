@@ -7,6 +7,7 @@ using RetinalTwin
 using DifferentialEquations
 using CairoMakie
 
+
 println("=" ^ 60)
 println("Simple Retinal Column: Photoreceptor → ON Bipolar")
 println("=" ^ 60)
