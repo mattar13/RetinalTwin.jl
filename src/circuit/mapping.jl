@@ -140,7 +140,6 @@ function build_column(;nPC::Int=1, nONBC::Int=1, nOFFBC::Int=1, nA2::Int=1, nGC:
         connect!(model, a2, onbc_names; release=:Glu, w=1.0)
     end
 
-    onbc_names = Symbol[Symbol(:ONBC, i) for i in 1:nONBC]
     offbc_names = Symbol[Symbol(:OFFBC, i) for i in 1:nOFFBC]
     a2_names = Symbol[Symbol(:A2, i) for i in 1:nA2]
     for i in 1:nGC

@@ -113,8 +113,8 @@ function (RCM::RetinalColumnModel)(du, u, p, t)
     params, stim_func = p
 
     for cell in values(RCM.cells)
-        if cell.cell_type != :PC && cell.cell_type != :ONBC && cell.cell_type != :GC
-            error("RetinalColumnModel callable phase-1 supports only :PC, :ONBC, and :GC")
+        if !(cell.cell_type in (:PC, :ONBC, :OFFBC, :A2, :GC, :MG))
+            error("RetinalColumnModel callable supports only :PC, :ONBC, :OFFBC, :A2, :GC, and :MG")
         end
     end
 
@@ -130,12 +130,56 @@ function (RCM::RetinalColumnModel)(du, u, p, t)
             inputs = get(RCM.connections, cell.name, Tuple{Symbol,Symbol,Float64}[])
             glu_in = sum(w * get_out(u, RCM.cells[pre], key) for (pre, key, w) in inputs)
             on_bipolar_model!(duc, uc, (params.ON_BIPOLAR_PARAMS, glu_in), t)
+        elseif cell.cell_type == :OFFBC
+            uc = uview(u, cell)
+            duc = duview(du, cell)
+            inputs = get(RCM.connections, cell.name, Tuple{Symbol,Symbol,Float64}[])
+            glu_in = sum(w * get_out(u, RCM.cells[pre], key) for (pre, key, w) in inputs)
+            off_bipolar_model!(duc, uc, (params.OFF_BIPOLAR_PARAMS, glu_in), t)
+        elseif cell.cell_type == :A2
+            uc = uview(u, cell)
+            duc = duview(du, cell)
+            inputs = get(RCM.connections, cell.name, Tuple{Symbol,Symbol,Float64}[])
+            glu_in = sum(w * get_out(u, RCM.cells[pre], key) for (pre, key, w) in inputs)
+            a2_model!(duc, uc, (params.A2_AMACRINE_PARAMS, glu_in), t)
         elseif cell.cell_type == :GC
             uc = uview(u, cell)
             duc = duview(du, cell)
             inputs = get(RCM.connections, cell.name, Tuple{Symbol,Symbol,Float64}[])
-            glu_exc = sum(w * get_out(u, RCM.cells[pre], key) for (pre, key, w) in inputs)
-            ganglion_model!(duc, uc, (params.GANGLION_PARAMS, glu_exc, 0.0), t)
+            glu_exc = sum(w * get_out(u, RCM.cells[pre], key) for (pre, key, w) in inputs if key == :Glu)
+            gly_in = sum(w * get_out(u, RCM.cells[pre], key) for (pre, key, w) in inputs if key == :Y || key == :Gly)
+            ganglion_model!(duc, uc, (params.GANGLION_PARAMS, glu_exc, gly_in), t)
+        elseif cell.cell_type == :MG
+            uc = uview(u, cell)
+            duc = duview(du, cell)
+
+            K_photo_efflux = zero(eltype(u))
+            K_onbc_efflux = zero(eltype(u))
+            K_offbc_efflux = zero(eltype(u))
+            K_a2_efflux = zero(eltype(u))
+            K_gc_efflux = zero(eltype(u))
+            glu_gc_exc = zero(eltype(u))
+
+            for src in values(RCM.cells)
+                usc = uview(u, src)
+                if src.cell_type == :PC
+                    K_photo_efflux += photoreceptor_K_efflux(usc, params.PHOTORECEPTOR_PARAMS)
+                elseif src.cell_type == :ONBC
+                    K_onbc_efflux += on_bipolar_K_efflux(usc, params.ON_BIPOLAR_PARAMS)
+                    glu_gc_exc += get_out(u, src, :Glu)
+                elseif src.cell_type == :OFFBC
+                    K_offbc_efflux += off_bipolar_K_efflux(usc, params.OFF_BIPOLAR_PARAMS)
+                    glu_gc_exc += get_out(u, src, :Glu)
+                elseif src.cell_type == :A2
+                    K_a2_efflux += a2_amacrine_K_efflux(usc, params.A2_AMACRINE_PARAMS)
+                elseif src.cell_type == :GC
+                    K_gc_efflux += ganglion_K_efflux(usc, params.GANGLION_PARAMS)
+                end
+            end
+
+            I_K_src_stalk = K_photo_efflux + K_onbc_efflux + K_offbc_efflux + K_a2_efflux + K_gc_efflux
+            I_K_src_end = 0.2 * (K_a2_efflux + K_gc_efflux) + 0.1 * K_onbc_efflux
+            muller_model!(duc, uc, (params.MULLER_PARAMS, I_K_src_end, I_K_src_stalk, glu_gc_exc), t)
         end
     end
 
