@@ -36,6 +36,12 @@ export muller_state, muller_model!
 include("cells/rpe.jl")
 export rpe_state, rpe_model!
 
+#--- Circuit Mapping
+include("circuit/mapping.jl")   
+export CellRef, RetinalColumnModel, global_idx, display_global_idxs
+export cell_range, uview, duview, get_out, connect!, build_column
+
+
 # --- Circuit wiring ---
 include("circuit/retinal_column.jl")
 export

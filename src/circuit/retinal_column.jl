@@ -2,43 +2,6 @@
 # retinal_column.jl — Retinal column model with direct coupling
 # ============================================================
 
-#We are working on a more complex mapping model that will add some convienance
-struct CellRef
-    name::Symbol
-    cell_type::Symbol
-    offset::Int
-    nstate::Int
-    outidx::Dict{Symbol,Int}
-end
-
-function CellRef(cell_type::Symbol, num::Int, offset::Int)
-    if cell_type == :PC
-        Symbol(cell_ty)
-        return CellRef(name, cell_type, offset, n_PC_STATES, Dict{Symbol,Int}())
-    elseif cell_type == :ONBC
-        return CellRef(name, cell_type, offset, n_ONBC_STATES, Dict{Symbol,Int}())
-    elseif cell_type == :OFFBC
-        return CellRef(name, cell_type, offset, n_OFFBC_STATES, Dict{Symbol,Int}())
-    elseif cell_type == :A2
-        return CellRef(name, cell_type, offset, n_A2_STATES, Dict{Symbol,Int}())
-    elseif cell_type == :GC
-        return CellRef(name, cell_type, offset, n_GC_STATES, Dict{Symbol,Int}())
-    elseif cell_type == :MG
-        return CellRef(name, cell_type, offset, n_MG_STATES, Dict{Symbol,Int}())
-    else
-        error("Invalid cell type: $cell_type")
-    end
-end
-
-CellRef()
-
-struct RetinalColumnModel
-
-
-
-end
-
-
 # ── State organization ──────────────────────────────────────
 
 DEFAULT_INDEXES = (
@@ -146,6 +109,38 @@ function gap_junction_coupling(dV1, V1, dV2, V2, cm1, cm2, g_gap)
     return nothing
 end
 
+function (RCM::RetinalColumnModel)(du, u, p, t)
+    params, stim_func = p
+
+    for cell in values(RCM.cells)
+        if cell.cell_type != :PC && cell.cell_type != :ONBC && cell.cell_type != :GC
+            error("RetinalColumnModel callable phase-1 supports only :PC, :ONBC, and :GC")
+        end
+    end
+
+    for cell in values(RCM.cells)
+        if cell.cell_type == :PC
+            uc = uview(u, cell)
+            duc = duview(du, cell)
+            photoreceptor_model!(duc, uc, (params.PHOTORECEPTOR_PARAMS, stim_func), t)
+        end
+        if cell.cell_type == :ONBC
+            uc = uview(u, cell)
+            duc = duview(du, cell)
+            inputs = get(RCM.connections, cell.name, Tuple{Symbol,Symbol,Float64}[])
+            glu_in = sum(w * get_out(u, RCM.cells[pre], key) for (pre, key, w) in inputs)
+            on_bipolar_model!(duc, uc, (params.ON_BIPOLAR_PARAMS, glu_in), t)
+        elseif cell.cell_type == :GC
+            uc = uview(u, cell)
+            duc = duview(du, cell)
+            inputs = get(RCM.connections, cell.name, Tuple{Symbol,Symbol,Float64}[])
+            glu_exc = sum(w * get_out(u, RCM.cells[pre], key) for (pre, key, w) in inputs)
+            ganglion_model!(duc, uc, (params.GANGLION_PARAMS, glu_exc, 0.0), t)
+        end
+    end
+
+    return nothing
+end
 
 # ── Main model function ─────────────────────────────────────
 
@@ -237,3 +232,4 @@ function retinal_column_model!(du, u, p, t)
     muller_model!(du_muller, u_muller, (params.MULLER_PARAMS, I_K_src_end, I_K_src_stalk, glu_gc_exc), t)
     return nothing
 end
+
