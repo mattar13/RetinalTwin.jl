@@ -40,6 +40,7 @@ NamedTuple with:
 function default_retinal_params()
     return (
         PHOTORECEPTOR_PARAMS = default_rod_params(),
+        HORIZONTAL_PARAMS = default_hc_params(),
         ON_BIPOLAR_PARAMS = default_on_bc_params(),
         OFF_BIPOLAR_PARAMS = default_off_bc_params(),
         A2_AMACRINE_PARAMS = default_a2_amacrine_params(),
@@ -113,8 +114,8 @@ function (RCM::RetinalColumnModel)(du, u, p, t)
     params, stim_func = p
 
     for cell in values(RCM.cells)
-        if !(cell.cell_type in (:PC, :ONBC, :OFFBC, :A2, :GC, :MG))
-            error("RetinalColumnModel callable supports only :PC, :ONBC, :OFFBC, :A2, :GC, and :MG")
+        if !(cell.cell_type in (:PC, :HC, :ONBC, :OFFBC, :A2, :GC, :MG))
+            error("RetinalColumnModel callable supports only :PC, :HC, :ONBC, :OFFBC, :A2, :GC, and :MG")
         end
     end
 
@@ -124,13 +125,26 @@ function (RCM::RetinalColumnModel)(du, u, p, t)
             duc = duview(du, cell)
             pc_stim(tt) = stim_func(tt, cell.x, cell.y)
             photoreceptor_model!(duc, uc, (params.PHOTORECEPTOR_PARAMS, pc_stim), t)
+        elseif cell.cell_type == :HC
+            uc = uview(u, cell)
+            duc = duview(du, cell)
+            inputs = get(RCM.connections, cell.name, Tuple{Symbol,Symbol,Float64}[])
+            glu_in = sum(w * get_out(u, RCM.cells[pre], key) for (pre, key, w) in inputs if key == :Glu)
+            V_hc = get_out(u, cell, :V)
+            I_gap = params.HORIZONTAL_PARAMS.g_gap *
+                sum(w * (get_out(u, RCM.cells[pre], key) - V_hc) for (pre, key, w) in inputs if key == :V)
+            horizontal_model!(duc, uc, (params.HORIZONTAL_PARAMS, 0.0, I_gap, glu_in), t)
         end
         if cell.cell_type == :ONBC
             uc = uview(u, cell)
             duc = duview(du, cell)
             inputs = get(RCM.connections, cell.name, Tuple{Symbol,Symbol,Float64}[])
-            glu_in = sum(w * get_out(u, RCM.cells[pre], key) for (pre, key, w) in inputs)
+            glu_in = sum(w * get_out(u, RCM.cells[pre], key) for (pre, key, w) in inputs if key == :Glu)
+            V_onbc = get_out(u, cell, :V)
+            I_gap = params.A2_AMACRINE_PARAMS.g_gap *
+                sum(w * (get_out(u, RCM.cells[pre], key) - V_onbc) for (pre, key, w) in inputs if key == :V)
             on_bipolar_model!(duc, uc, (params.ON_BIPOLAR_PARAMS, glu_in), t)
+            duc[ONBC_IC_MAP.V] += I_gap / params.ON_BIPOLAR_PARAMS.C_m
         elseif cell.cell_type == :OFFBC
             uc = uview(u, cell)
             duc = duview(du, cell)
@@ -141,8 +155,12 @@ function (RCM::RetinalColumnModel)(du, u, p, t)
             uc = uview(u, cell)
             duc = duview(du, cell)
             inputs = get(RCM.connections, cell.name, Tuple{Symbol,Symbol,Float64}[])
-            glu_in = sum(w * get_out(u, RCM.cells[pre], key) for (pre, key, w) in inputs)
+            glu_in = sum(w * get_out(u, RCM.cells[pre], key) for (pre, key, w) in inputs if key == :Glu)
+            V_a2 = get_out(u, cell, :V)
+            I_gap = params.A2_AMACRINE_PARAMS.g_gap *
+                sum(w * (get_out(u, RCM.cells[pre], key) - V_a2) for (pre, key, w) in inputs if key == :V)
             a2_model!(duc, uc, (params.A2_AMACRINE_PARAMS, glu_in), t)
+            duc[A2_IC_MAP.V] += I_gap / params.A2_AMACRINE_PARAMS.C_m
         elseif cell.cell_type == :GC
             uc = uview(u, cell)
             duc = duview(du, cell)

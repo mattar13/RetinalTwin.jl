@@ -13,6 +13,8 @@ function CellRef(cell_type::Symbol, num::Int, offset::Int; x::Real=NaN, y::Real=
     symbol = Symbol(cell_type, num)
     if cell_type == :PC
         return CellRef(symbol, cell_type, offset, n_PC_STATES, PC_IC_MAP, Float64(x), Float64(y))
+    elseif cell_type == :HC
+        return CellRef(symbol, cell_type, offset, n_HC_STATES, HC_IC_MAP, Float64(x), Float64(y))
     elseif cell_type == :ONBC
         return CellRef(symbol, cell_type, offset, n_ONBC_STATES, ONBC_IC_MAP, Float64(x), Float64(y))
     elseif cell_type == :OFFBC
@@ -86,7 +88,7 @@ function square_grid_coords(n::Int)
     return coords
 end
 
-function build_column(;nPC::Int=1, nONBC::Int=1, nOFFBC::Int=1, nA2::Int=1, nGC::Int=1, nMG::Int=1, pc_coords=nothing)
+function build_column(;nPC::Int=16, nHC::Int=4, nONBC::Int=4, nOFFBC::Int=0, nA2::Int=4, nGC::Int=1, nMG::Int=4, pc_coords=nothing)
     if pc_coords !== nothing && length(pc_coords) != nPC
         error("pc_coords length ($(length(pc_coords))) must equal nPC ($nPC)")
     end
@@ -102,6 +104,13 @@ function build_column(;nPC::Int=1, nONBC::Int=1, nOFFBC::Int=1, nA2::Int=1, nGC:
         cell = CellRef(:PC, i, offset; x=x, y=y)
         cells[cell.name] = cell
         push!(u0_parts, photoreceptor_state(params.PHOTORECEPTOR_PARAMS))
+        offset += cell.nstate
+    end
+
+    for i in 1:nHC
+        cell = CellRef(:HC, i, offset)
+        cells[cell.name] = cell
+        push!(u0_parts, horizontal_state(params.HORIZONTAL_PARAMS))
         offset += cell.nstate
     end
 
@@ -143,6 +152,18 @@ function build_column(;nPC::Int=1, nONBC::Int=1, nOFFBC::Int=1, nA2::Int=1, nGC:
     model = RetinalColumnModel(cells, connections)
 
     pc_names = Symbol[Symbol(:PC, i) for i in 1:nPC]
+
+    for i in 1:nHC
+        hc = Symbol(:HC, i)
+        connect!(model, hc, pc_names; release=:Glu, w=1.0)
+    end
+
+    for i in 1:nHC, j in 1:nHC
+        if i != j
+            connect!(model, Symbol(:HC, i), Symbol(:HC, j); release=:V, w=1.0)
+        end
+    end
+
     for i in 1:nONBC
         onbc = Symbol(:ONBC, i)
         connect!(model, onbc, pc_names; release=:Glu, w=1.0)
@@ -157,10 +178,16 @@ function build_column(;nPC::Int=1, nONBC::Int=1, nOFFBC::Int=1, nA2::Int=1, nGC:
     for i in 1:nA2
         a2 = Symbol(:A2, i)
         connect!(model, a2, onbc_names; release=:Glu, w=1.0)
+        connect!(model, a2, onbc_names; release=:V, w=1.0)
+    end
+
+    a2_names = Symbol[Symbol(:A2, i) for i in 1:nA2]
+    for i in 1:nONBC
+        onbc = Symbol(:ONBC, i)
+        connect!(model, onbc, a2_names; release=:V, w=1.0)
     end
 
     offbc_names = Symbol[Symbol(:OFFBC, i) for i in 1:nOFFBC]
-    a2_names = Symbol[Symbol(:A2, i) for i in 1:nA2]
     for i in 1:nGC
         gc = Symbol(:GC, i)
         connect!(model, gc, onbc_names; release=:Glu, w=1.0)

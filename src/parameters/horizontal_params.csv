@@ -2,17 +2,34 @@ Key,Value,Description
 C_m,20.0,Membrane capacitance (pF)
 I_app,0.0,Applied current (pA)
 g_L,2.0,Leak conductance (nS)
-g_Ca,4.0,Ca conductance (nS)
-g_K,8.0,K conductance (nS)
 E_L,-60.0,Leak reversal potential (mV)
-E_Ca,120.0,Ca reversal potential (mV)
-E_K,-84.0,K reversal potential (mV)
-V1,-1.2,Ca activation midpoint (mV)
-V2,18.0,Ca activation slope (mV)
-V3,12.0,K activation midpoint (mV)
-V4,17.0,K activation slope (mV)
-phi,0.067,Recovery time scale
-alpha_Glu,1.0,Max glutamate release
-V_Glu_half,-40.0,Release half-activation (mV)
-V_Glu_slope,5.0,Release slope (mV)
-tau_Glu,10.0,Glutamate clearance time (ms)
+
+g_exc,8.0,Static AMPA/KA-like excitatory conductance (nS)
+E_exc,0.0,Excitatory reversal potential (mV)
+K_Glu,0.7,Glutamate half-activation for excitation gate
+n_Glu,2.0,Hill coefficient for glutamate excitation gate
+
+g_CaL,0.6,L-type Ca conductance (nS)
+E_Ca,60.0,Calcium reversal potential (mV)
+Vm_half,-45.0,Ca activation midpoint (mV)
+km_slope,7.0,Ca activation slope (mV)
+tau_c,40.0,Intracellular Ca pool decay time constant (ms)
+k_c,0.005,Ca influx to pool scaling factor
+
+E_K,-84.0,Potassium reversal potential for BK (mV)
+E_Kir,-84.0,Potassium reversal potential for Kir (mV)
+g_Kir,2.0,Inward-rectifier K conductance (nS)
+Kir_Vshift,15.0,Kir rectification shift from E_Kir (mV)
+Kir_k,6.0,Kir rectification slope (mV)
+g_gap,1.0,Gap junction coupling conductance between horizontal cells (nS)
+
+gBK,3.0,BK channel max conductance (nS)
+Vhalf0_BK,-10.0,BK base half-activation voltage at Caref (mV)
+k_BK,8.0,BK activation slope (mV)
+s_BK,20.0,Ca-dependent BK Vhalf shift scale (mV)
+Caref_BK,0.1,Reference Ca level for BK gate (same units as c)
+
+K_Release,0.6,Ca half-activation for GABA release proxy
+n_Release,3.0,Hill coefficient for Ca-driven GABA release proxy
+a_Release,0.5,Scaling for Ca-driven GABA release proxy
+tau_Release,5.0,Release proxy filtering / effective clearance time constant (ms)
