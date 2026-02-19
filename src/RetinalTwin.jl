@@ -6,6 +6,7 @@ using Statistics
 # --- Core types ---
 # --- Default parameters ---
 include("parameters/parameter_extraction.jl")
+include("auxiliary_functions.jl")
 export
     # Parameter loading
     default_rod_params,

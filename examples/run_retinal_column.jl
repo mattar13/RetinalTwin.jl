@@ -9,7 +9,7 @@ println("=" ^ 60)
 
 params = default_retinal_params()
 pc_coords = square_grid_coords(16)
-model, u0 = build_column(nPC=16, nONBC=2, pc_coords=pc_coords)
+model, u0 = build_column(pc_coords=pc_coords)
 
 println("Cells: ", ordered_cells(model))
 println("Total states: ", length(u0))

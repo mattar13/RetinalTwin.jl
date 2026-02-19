@@ -2,11 +2,12 @@ using CairoMakie
 
 const CELL_TYPE_ORDER = Dict(
     :PC => 1,
-    :ONBC => 2,
-    :OFFBC => 3,
-    :A2 => 4,
-    :GC => 5,
-    :MG => 6,
+    :HC => 2,
+    :ONBC => 3,
+    :OFFBC => 4,
+    :A2 => 5,
+    :GC => 6,
+    :MG => 7,
 )
 
 function _cell_sort_key(name::Symbol, cell::CellRef)
@@ -22,6 +23,8 @@ ordered_cells(model::RetinalColumnModel) =
 function calcium_spec(cell_type::Symbol)
     if cell_type == :PC
         return (:Ca_f, "Ca (Ca_f)")
+    elseif cell_type == :HC
+        return (:c, "Ca (c)")
     elseif cell_type == :ONBC || cell_type == :OFFBC || cell_type == :A2
         return (:c, "Ca (c)")
     elseif cell_type == :GC
@@ -36,6 +39,8 @@ end
 function release_spec(cell_type::Symbol)
     if cell_type == :PC || cell_type == :ONBC || cell_type == :OFFBC
         return (:Glu, "Glutamate")
+    elseif cell_type == :HC
+        return (:I, "Release proxy (I)")
     elseif cell_type == :A2
         return (:Y, "Release proxy (Y)")
     elseif cell_type == :GC
@@ -179,6 +184,7 @@ function plot_cell_layout_3d(
     model::RetinalColumnModel;
     savepath::AbstractString,
     z_pc::Real=1.0,
+    z_hc::Real=1.5,
     z_bc::Real=2.0,
     z_gc::Real=3.0,
     stimulus_func=nothing,
@@ -188,6 +194,7 @@ function plot_cell_layout_3d(
 )
     names = ordered_cells(model)
     pc_names = [nm for nm in names if model.cells[nm].cell_type == :PC]
+    hc_names = [nm for nm in names if model.cells[nm].cell_type == :HC]
     onbc_names = [nm for nm in names if model.cells[nm].cell_type == :ONBC]
     offbc_names = [nm for nm in names if model.cells[nm].cell_type == :OFFBC]
     gc_names = [nm for nm in names if model.cells[nm].cell_type == :GC]
@@ -209,10 +216,14 @@ function plot_cell_layout_3d(
     off_y = bc_y[(n_on + 1):end]
 
     gc_x, gc_y = _coords_for_names(model, gc_names; xbounds=(xlo, xhi), ybounds=(ylo, yhi))
+    hc_x, hc_y = _coords_for_names(model, hc_names; xbounds=(xlo, xhi), ybounds=(ylo, yhi))
 
     coord_by_name = Dict{Symbol,NTuple{3,Float64}}()
     for (i, nm) in enumerate(pc_names)
         coord_by_name[nm] = (pc_x[i], pc_y[i], Float64(z_pc))
+    end
+    for (i, nm) in enumerate(hc_names)
+        coord_by_name[nm] = (hc_x[i], hc_y[i], Float64(z_hc))
     end
     for (i, nm) in enumerate(onbc_names)
         coord_by_name[nm] = (on_x[i], on_y[i], Float64(z_bc))
@@ -276,6 +287,9 @@ function plot_cell_layout_3d(
     if !isempty(pc_x)
         scatter!(ax, pc_x, pc_y, fill(Float64(z_pc), length(pc_x)); markersize=16, color=:goldenrod2, label="Photoreceptors (PC)")
     end
+    if !isempty(hc_x)
+        scatter!(ax, hc_x, hc_y, fill(Float64(z_hc), length(hc_x)); markersize=16, color=:orchid3, marker=:diamond, label="Horizontal (HC)")
+    end
     if !isempty(on_x)
         scatter!(ax, on_x, on_y, fill(Float64(z_bc), length(on_x)); markersize=18, color=:deepskyblue3, marker=:circle, label="ON Bipolar (ONBC)")
     end
@@ -286,7 +300,13 @@ function plot_cell_layout_3d(
         scatter!(ax, gc_x, gc_y, fill(Float64(z_gc), length(gc_x)); markersize=20, color=:seagreen4, marker=:rect, label="Ganglion (RGC/GC)")
     end
 
-    ax.zticks = ([Float64(z_pc), Float64(z_bc), Float64(z_gc)], ["PC", "BC", "RGC"])
+    ztick_vals = Float64[Float64(z_pc), Float64(z_bc), Float64(z_gc)]
+    ztick_labels = String["PC", "BC", "RGC"]
+    if !isempty(hc_x)
+        push!(ztick_vals, Float64(z_hc))
+        push!(ztick_labels, "HC")
+    end
+    ax.zticks = (ztick_vals, ztick_labels)
     axislegend(ax, position=:rb)
 
     mkpath(dirname(savepath))
