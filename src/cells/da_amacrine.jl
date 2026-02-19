@@ -2,25 +2,6 @@
 # da_amacrine.jl - Dopaminergic Amacrine cell dynamics
 # ============================================================
 
-# ── State indices ───────────────────────────────────────────
-
-const DA_STATE_VARS = 3
-const DA_V_INDEX = 1
-const DA_W_INDEX = 2
-const DA_DA_INDEX = 3
-
-# ── 1. Default Parameters ───────────────────────────────────
-
-"""
-    default_da_params()
-
-Return default parameters for the dopaminergic amacrine cell model as a named tuple.
-Parameters are loaded from da_amacrine_params.csv.
-"""
-function default_da_params()
-    return default_da_params_csv()
-end
-
 # ── 2. Initial Conditions ───────────────────────────────────
 
 """

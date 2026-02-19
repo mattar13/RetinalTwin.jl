@@ -1,24 +1,38 @@
 using CairoMakie
 
-const CELL_TYPE_ORDER = Dict(
-    :PC => 1,
-    :HC => 2,
-    :ONBC => 3,
-    :OFFBC => 4,
-    :A2 => 5,
-    :GC => 6,
-    :MG => 7,
+const Z_DEPTH = Dict(
+    :PC => 1.0,
+    :HC => 1.5,
+    :ONBC => 2.0,
+    :OFFBC => 2.0,
+    :MG => 2.3,
+    :A2 => 2.6,
+    :GC => 3.0,
 )
+
+const CELL_TYPE_ORDER = sort(collect(keys(Z_DEPTH)), by=ct -> (Z_DEPTH[ct], String(ct)))
 
 function _cell_sort_key(name::Symbol, cell::CellRef)
     s = String(name)
     m = match(r"\d+$", s)
     idx = m === nothing ? 0 : parse(Int, m.match)
-    return (get(CELL_TYPE_ORDER, cell.cell_type, 99), idx, s)
+    rank = findfirst(==(cell.cell_type), CELL_TYPE_ORDER)
+    return (rank === nothing ? 99 : rank, idx, s)
 end
 
 ordered_cells(model::RetinalColumnModel) =
     sort!(collect(keys(model.cells)), by=name -> _cell_sort_key(name, model.cells[name]))
+
+function present_cell_types(model::RetinalColumnModel)
+    types = Symbol[]
+    for nm in ordered_cells(model)
+        ct = model.cells[nm].cell_type
+        if !(ct in types)
+            push!(types, ct)
+        end
+    end
+    return types
+end
 
 function calcium_spec(cell_type::Symbol)
     if cell_type == :PC
@@ -61,13 +75,27 @@ function plot_all_cells_v_ca_release(
     stim_start::Real,
     stim_end::Real,
     savepath::AbstractString,
+    z_pc::Real=1.0,
+    z_hc::Real=1.5,
+    z_bc::Real=2.0,
+    z_mg::Real=2.3,
+    z_a2::Real=2.6,
+    z_gc::Real=3.0,
 )
     names = ordered_cells(model)
-    present_types = Symbol[]
-    for name in names
-        ctype = model.cells[name].cell_type
-        if !(ctype in present_types)
-            push!(present_types, ctype)
+    z_depth = Dict{Symbol,Float64}(k => Float64(v) for (k, v) in Z_DEPTH)
+    z_depth[:PC] = Float64(z_pc)
+    z_depth[:HC] = Float64(z_hc)
+    z_depth[:ONBC] = Float64(z_bc)
+    z_depth[:OFFBC] = Float64(z_bc)
+    z_depth[:MG] = Float64(z_mg)
+    z_depth[:A2] = Float64(z_a2)
+    z_depth[:GC] = Float64(z_gc)
+    present_types_all = present_cell_types(model)
+    present_types = Symbol[ct for ct in CELL_TYPE_ORDER if ct in present_types_all]
+    for ct in present_types_all
+        if !(ct in present_types)
+            push!(present_types, ct)
         end
     end
     nrows = length(present_types)
@@ -183,21 +211,37 @@ end
 function plot_cell_layout_3d(
     model::RetinalColumnModel;
     savepath::AbstractString,
-    z_pc::Real=1.0,
-    z_hc::Real=1.5,
-    z_bc::Real=2.0,
-    z_gc::Real=3.0,
     stimulus_func=nothing,
     stimulus_time::Real=0.0,
     stimulus_grid_n::Int=41,
     z_stim::Real=0.0,
 )
     names = ordered_cells(model)
-    pc_names = [nm for nm in names if model.cells[nm].cell_type == :PC]
-    hc_names = [nm for nm in names if model.cells[nm].cell_type == :HC]
-    onbc_names = [nm for nm in names if model.cells[nm].cell_type == :ONBC]
-    offbc_names = [nm for nm in names if model.cells[nm].cell_type == :OFFBC]
-    gc_names = [nm for nm in names if model.cells[nm].cell_type == :GC]
+    z_depth = Dict{Symbol,Float64}(k => Float64(v) for (k, v) in Z_DEPTH)
+    present_types_all = present_cell_types(model)
+    present_types = Symbol[ct for ct in CELL_TYPE_ORDER if ct in present_types_all]
+    for ct in present_types_all
+        if !(ct in present_types)
+            push!(present_types, ct)
+        end
+    end
+
+    style_by_type = Dict(
+        :PC => (color=:goldenrod2, marker=:circle, markersize=16, label="Photoreceptors (PC)"),
+        :HC => (color=:orchid3, marker=:diamond, markersize=16, label="Horizontal (HC)"),
+        :ONBC => (color=:deepskyblue3, marker=:circle, markersize=18, label="ON Bipolar (ONBC)"),
+        :OFFBC => (color=:orangered3, marker=:utriangle, markersize=18, label="OFF Bipolar (OFFBC)"),
+        :MG => (color=:slategray3, marker=:cross, markersize=16, label="Muller (MG)"),
+        :A2 => (color=:mediumpurple3, marker=:hexagon, markersize=18, label="A2 Amacrine (A2)"),
+        :GC => (color=:seagreen4, marker=:rect, markersize=20, label="Ganglion (RGC/GC)"),
+    )
+
+    names_by_type = Dict{Symbol,Vector{Symbol}}()
+    for ct in present_types
+        names_by_type[ct] = [nm for nm in names if model.cells[nm].cell_type == ct]
+    end
+
+    pc_names = get(names_by_type, :PC, Symbol[])
 
     pc_x, pc_y = _coords_for_names(model, pc_names)
     xlo = isempty(pc_x) ? 1.0 : minimum(pc_x)
@@ -207,32 +251,18 @@ function plot_cell_layout_3d(
     xlo == xhi && (xlo -= 0.5; xhi += 0.5)
     ylo == yhi && (ylo -= 0.5; yhi += 0.5)
 
-    bc_names = vcat(onbc_names, offbc_names)
-    bc_x, bc_y = _coords_for_names(model, bc_names; xbounds=(xlo, xhi), ybounds=(ylo, yhi))
-    n_on = length(onbc_names)
-    on_x = bc_x[1:n_on]
-    on_y = bc_y[1:n_on]
-    off_x = bc_x[(n_on + 1):end]
-    off_y = bc_y[(n_on + 1):end]
-
-    gc_x, gc_y = _coords_for_names(model, gc_names; xbounds=(xlo, xhi), ybounds=(ylo, yhi))
-    hc_x, hc_y = _coords_for_names(model, hc_names; xbounds=(xlo, xhi), ybounds=(ylo, yhi))
+    coords_by_type = Dict{Symbol,Tuple{Vector{Float64},Vector{Float64}}}()
+    for ct in present_types
+        coords_by_type[ct] = _coords_for_names(model, names_by_type[ct]; xbounds=(xlo, xhi), ybounds=(ylo, yhi))
+    end
 
     coord_by_name = Dict{Symbol,NTuple{3,Float64}}()
-    for (i, nm) in enumerate(pc_names)
-        coord_by_name[nm] = (pc_x[i], pc_y[i], Float64(z_pc))
-    end
-    for (i, nm) in enumerate(hc_names)
-        coord_by_name[nm] = (hc_x[i], hc_y[i], Float64(z_hc))
-    end
-    for (i, nm) in enumerate(onbc_names)
-        coord_by_name[nm] = (on_x[i], on_y[i], Float64(z_bc))
-    end
-    for (i, nm) in enumerate(offbc_names)
-        coord_by_name[nm] = (off_x[i], off_y[i], Float64(z_bc))
-    end
-    for (i, nm) in enumerate(gc_names)
-        coord_by_name[nm] = (gc_x[i], gc_y[i], Float64(z_gc))
+    for ct in present_types
+        xs, ys = coords_by_type[ct]
+        z = Float64(get(z_depth, ct, 0.0))
+        for (i, nm) in enumerate(names_by_type[ct])
+            coord_by_name[nm] = (xs[i], ys[i], z)
+        end
     end
 
     fig = Figure(size=(1000, 700))
@@ -261,9 +291,10 @@ function plot_cell_layout_3d(
             ys,
             z_plane;
             color=stim_vals,
+            alpha = 0.5,
             colormap=:inferno,
             shading=NoShading,
-            alpha=0.9,
+            label = "Stimulus",
         )
     end
 
@@ -284,27 +315,31 @@ function plot_cell_layout_3d(
         end
     end
 
-    if !isempty(pc_x)
-        scatter!(ax, pc_x, pc_y, fill(Float64(z_pc), length(pc_x)); markersize=16, color=:goldenrod2, label="Photoreceptors (PC)")
-    end
-    if !isempty(hc_x)
-        scatter!(ax, hc_x, hc_y, fill(Float64(z_hc), length(hc_x)); markersize=16, color=:orchid3, marker=:diamond, label="Horizontal (HC)")
-    end
-    if !isempty(on_x)
-        scatter!(ax, on_x, on_y, fill(Float64(z_bc), length(on_x)); markersize=18, color=:deepskyblue3, marker=:circle, label="ON Bipolar (ONBC)")
-    end
-    if !isempty(off_x)
-        scatter!(ax, off_x, off_y, fill(Float64(z_bc), length(off_x)); markersize=18, color=:orangered3, marker=:utriangle, label="OFF Bipolar (OFFBC)")
-    end
-    if !isempty(gc_x)
-        scatter!(ax, gc_x, gc_y, fill(Float64(z_gc), length(gc_x)); markersize=20, color=:seagreen4, marker=:rect, label="Ganglion (RGC/GC)")
+    for ct in present_types
+        xs, ys = coords_by_type[ct]
+        isempty(xs) && continue
+        st = get(style_by_type, ct, (color=:black, marker=:circle, markersize=14, label=String(ct)))
+        z = Float64(get(z_depth, ct, 0.0))
+        scatter!(
+            ax,
+            xs,
+            ys,
+            fill(z, length(xs));
+            markersize=st.markersize,
+            color=st.color,
+            marker=st.marker,
+            label=st.label,
+        )
     end
 
-    ztick_vals = Float64[Float64(z_pc), Float64(z_bc), Float64(z_gc)]
-    ztick_labels = String["PC", "BC", "RGC"]
-    if !isempty(hc_x)
-        push!(ztick_vals, Float64(z_hc))
-        push!(ztick_labels, "HC")
+    ztick_vals = Float64[]
+    ztick_labels = String[]
+    for ct in present_types
+        z = Float64(get(z_depth, ct, 0.0))
+        if !(z in ztick_vals)
+            push!(ztick_vals, z)
+            push!(ztick_labels, String(ct))
+        end
     end
     ax.zticks = (ztick_vals, ztick_labels)
     axislegend(ax, position=:rb)

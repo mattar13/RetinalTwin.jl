@@ -123,7 +123,9 @@ function (RCM::RetinalColumnModel)(du, u, p, t)
         if cell.cell_type == :PC
             uc = uview(u, cell)
             duc = duview(du, cell)
-            pc_stim(tt) = stim_func(tt, cell.x, cell.y)
+            x = cell.x
+            y = cell.y
+            pc_stim(tt) = stim_func(tt, x, y)
             photoreceptor_model!(duc, uc, (params.PHOTORECEPTOR_PARAMS, pc_stim), t)
         elseif cell.cell_type == :HC
             uc = uview(u, cell)

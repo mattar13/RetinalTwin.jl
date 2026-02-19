@@ -2,27 +2,6 @@
 # gaba_amacrine.jl - GABAergic Amacrine cell dynamics
 # ============================================================
 
-# ── State indices ───────────────────────────────────────────
-
-const GABA_STATE_VARS = 3
-const GABA_V_INDEX = 1
-const GABA_W_INDEX = 2
-const GABA_GABA_INDEX = 3
-
-# ── 1. Default Parameters ───────────────────────────────────
-
-"""
-    default_gaba_params()
-
-Return default parameters for the GABAergic amacrine cell model as a named tuple.
-Parameters are loaded from gaba_amacrine_params.csv.
-"""
-function default_gaba_params()
-    return default_gaba_params_csv()
-end
-
-# ── 2. Initial Conditions ───────────────────────────────────
-
 """
     gaba_dark_state(params)
 

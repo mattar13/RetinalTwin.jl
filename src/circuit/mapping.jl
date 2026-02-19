@@ -88,10 +88,15 @@ function square_grid_coords(n::Int)
     return coords
 end
 
-function build_column(;nPC::Int=16, nHC::Int=4, nONBC::Int=4, nOFFBC::Int=0, nA2::Int=4, nGC::Int=1, nMG::Int=4, pc_coords=nothing)
+function build_column(;nPC::Int=16, nHC::Int=4, nONBC::Int=4, nOFFBC::Int=0, nA2::Int=4, nGC::Int=1, nMG::Int=4, onbc_pool_size::Int=4, pc_coords=nothing)
     if pc_coords !== nothing && length(pc_coords) != nPC
         error("pc_coords length ($(length(pc_coords))) must equal nPC ($nPC)")
     end
+    onbc_pool_size < 1 && error("onbc_pool_size must be >= 1, got $onbc_pool_size")
+    nPC > nONBC * onbc_pool_size && error(
+        "Insufficient ONBC pooling capacity: nPC=$nPC, nONBC=$nONBC, onbc_pool_size=$onbc_pool_size. " *
+        "Increase nONBC or onbc_pool_size."
+    )
 
     params = default_retinal_params()
     cells = Dict{Symbol,CellRef}()
@@ -166,7 +171,11 @@ function build_column(;nPC::Int=16, nHC::Int=4, nONBC::Int=4, nOFFBC::Int=0, nA2
 
     for i in 1:nONBC
         onbc = Symbol(:ONBC, i)
-        connect!(model, onbc, pc_names; release=:Glu, w=1.0)
+        first_pc = (i - 1) * onbc_pool_size + 1
+        last_pc = min(i * onbc_pool_size, nPC)
+        if first_pc <= nPC
+            connect!(model, onbc, pc_names[first_pc:last_pc]; release=:Glu, w=1.0)
+        end
     end
 
     for i in 1:nOFFBC
