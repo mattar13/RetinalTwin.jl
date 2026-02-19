@@ -112,7 +112,7 @@ function gaba_model!(du, u, p, t)
     dw = phi * (w_inf - w) / max(tau_w, 0.1)
 
     # GABA release
-    T_inf = 1.0 / (1.0 + exp(-(V - V_GABA_half) / V_GABA_slope))
+    T_inf = gate_inf(V, V_GABA_half, V_GABA_slope)
     dGABA = (alpha_GABA * T_inf - GABA) / tau_GABA
 
     # Assign derivatives

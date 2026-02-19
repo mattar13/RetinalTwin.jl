@@ -110,7 +110,7 @@ function da_model!(du, u, p, t)
     dw = phi * (w_inf - w) / max(tau_w, 0.1)
 
     # Dopamine release (very slow)
-    T_inf = 1.0 / (1.0 + exp(-(V - V_DA_half) / V_DA_slope))
+    T_inf = gate_inf(V, V_DA_half, V_DA_slope)
     dDA = (alpha_DA * T_inf - DA) / tau_DA
 
     # Assign derivatives
