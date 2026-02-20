@@ -1,6 +1,7 @@
 module RetinalTwin
 
 using LinearAlgebra
+using JSON
 using Statistics
 
 # --- Core types ---
@@ -41,6 +42,7 @@ export rpe_state, rpe_model!
 include("circuit/mapping.jl")   
 export CellRef, RetinalColumnModel, global_idx, display_global_idxs
 export cell_range, uview, duview, get_out, connect!, square_grid_coords, build_column
+export save_mapping, load_mapping
 
 
 # --- Circuit wiring ---
