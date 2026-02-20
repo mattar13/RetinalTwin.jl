@@ -131,45 +131,51 @@ function (RCM::RetinalColumnModel)(du, u, p, t)
             uc = uview(u, cell)
             duc = duview(du, cell)
             inputs = get(RCM.connections, cell.name, Tuple{Symbol,Symbol,Float64}[])
-            glu_in = sum(w * get_out(u, RCM.cells[pre], key) for (pre, key, w) in inputs if key == :Glu)
+            glu_in = [get_out(u, RCM.cells[pre], key) for (pre, key, _) in inputs if key == :Glu]
+            w_glu_in = [w for (_, key, w) in inputs if key == :Glu]
             V_hc = get_out(u, cell, :V)
             I_gap = params.HORIZONTAL_PARAMS.g_gap *
                 sum(w * (get_out(u, RCM.cells[pre], key) - V_hc) for (pre, key, w) in inputs if key == :V)
-            horizontal_model!(duc, uc, (params.HORIZONTAL_PARAMS, 0.0, I_gap, glu_in), t)
+            horizontal_model!(duc, uc, (params.HORIZONTAL_PARAMS, I_gap, glu_in, w_glu_in), t)
         end
         if cell.cell_type == :ONBC
             uc = uview(u, cell)
             duc = duview(du, cell)
             inputs = get(RCM.connections, cell.name, Tuple{Symbol,Symbol,Float64}[])
-            glu_in = sum(w * get_out(u, RCM.cells[pre], key) for (pre, key, w) in inputs if key == :Glu)
+            glu_in = [get_out(u, RCM.cells[pre], key) for (pre, key, _) in inputs if key == :Glu]
+            w_glu_in = [w for (_, key, w) in inputs if key == :Glu]
             V_onbc = get_out(u, cell, :V)
             I_gap = params.A2_AMACRINE_PARAMS.g_gap *
                 sum(w * (get_out(u, RCM.cells[pre], key) - V_onbc) for (pre, key, w) in inputs if key == :V)
-            on_bipolar_model!(duc, uc, (params.ON_BIPOLAR_PARAMS, glu_in), t)
+            on_bipolar_model!(duc, uc, (params.ON_BIPOLAR_PARAMS, glu_in, w_glu_in), t)
             duc[ONBC_IC_MAP.V] += I_gap / params.ON_BIPOLAR_PARAMS.C_m
         elseif cell.cell_type == :OFFBC
             uc = uview(u, cell)
             duc = duview(du, cell)
             inputs = get(RCM.connections, cell.name, Tuple{Symbol,Symbol,Float64}[])
-            glu_in = sum(w * get_out(u, RCM.cells[pre], key) for (pre, key, w) in inputs)
-            off_bipolar_model!(duc, uc, (params.OFF_BIPOLAR_PARAMS, glu_in), t)
+            glu_in = [get_out(u, RCM.cells[pre], key) for (pre, key, _) in inputs if key == :Glu]
+            w_glu_in = [w for (_, key, w) in inputs if key == :Glu]
+            off_bipolar_model!(duc, uc, (params.OFF_BIPOLAR_PARAMS, glu_in, w_glu_in), t)
         elseif cell.cell_type == :A2
             uc = uview(u, cell)
             duc = duview(du, cell)
             inputs = get(RCM.connections, cell.name, Tuple{Symbol,Symbol,Float64}[])
-            glu_in = sum(w * get_out(u, RCM.cells[pre], key) for (pre, key, w) in inputs if key == :Glu)
+            glu_in = [get_out(u, RCM.cells[pre], key) for (pre, key, _) in inputs if key == :Glu]
+            w_glu_in = [w for (_, key, w) in inputs if key == :Glu]
             V_a2 = get_out(u, cell, :V)
             I_gap = params.A2_AMACRINE_PARAMS.g_gap *
                 sum(w * (get_out(u, RCM.cells[pre], key) - V_a2) for (pre, key, w) in inputs if key == :V)
-            a2_model!(duc, uc, (params.A2_AMACRINE_PARAMS, glu_in), t)
+            a2_model!(duc, uc, (params.A2_AMACRINE_PARAMS, glu_in, w_glu_in), t)
             duc[A2_IC_MAP.V] += I_gap / params.A2_AMACRINE_PARAMS.C_m
         elseif cell.cell_type == :GC
             uc = uview(u, cell)
             duc = duview(du, cell)
             inputs = get(RCM.connections, cell.name, Tuple{Symbol,Symbol,Float64}[])
-            glu_exc = sum(w * get_out(u, RCM.cells[pre], key) for (pre, key, w) in inputs if key == :Glu)
-            gly_in = sum(w * get_out(u, RCM.cells[pre], key) for (pre, key, w) in inputs if key == :Y || key == :Gly)
-            ganglion_model!(duc, uc, (params.GANGLION_PARAMS, glu_exc, gly_in), t)
+            glu_in = [get_out(u, RCM.cells[pre], key) for (pre, key, _) in inputs if key == :Glu]
+            w_glu_in = [w for (_, key, w) in inputs if key == :Glu]
+            gly_in = [get_out(u, RCM.cells[pre], key) for (pre, key, _) in inputs if key == :Y || key == :Gly]
+            w_gly_in = [w for (_, key, w) in inputs if key == :Y || key == :Gly]
+            ganglion_model!(duc, uc, (params.GANGLION_PARAMS, glu_in, w_glu_in, gly_in, w_gly_in), t)
         elseif cell.cell_type == :MG
             uc = uview(u, cell)
             duc = duview(du, cell)
@@ -265,20 +271,36 @@ function retinal_column_model!(du, u, p, t)
     photoreceptor_model!(du_photoreceptor, u_photoreceptor, (params.PHOTORECEPTOR_PARAMS, stim_func), t)
 
     # ON bipolar (receives glutamate from photoreceptor)
-    on_bipolar_model!(du_on_bipolar, u_on_bipolar, (params.ON_BIPOLAR_PARAMS, glu_photo_release), t)
+    on_bipolar_model!(
+        du_on_bipolar, u_on_bipolar,
+        (params.ON_BIPOLAR_PARAMS, [glu_photo_release], [1.0]),
+        t
+    )
     glu_on_bipolar_release = u_on_bipolar[idxs.ONBC_GLU_INDEX]
 
     # OFF bipolar (receives glutamate from photoreceptor)
-    off_bipolar_model!(du_off_bipolar, u_off_bipolar, (params.OFF_BIPOLAR_PARAMS, glu_photo_release), t)
+    off_bipolar_model!(
+        du_off_bipolar, u_off_bipolar,
+        (params.OFF_BIPOLAR_PARAMS, [glu_photo_release], [1.0]),
+        t
+    )
     glu_off_bipolar_release = u_off_bipolar[idxs.OFFBC_GLU_INDEX]
 
     # A2 amacrine cell (receives glutamate from ON bipolar cell)
-    a2_model!(du_a2, u_a2, (params.A2_AMACRINE_PARAMS, glu_on_bipolar_release), t)
+    a2_model!(
+        du_a2, u_a2,
+        (params.A2_AMACRINE_PARAMS, [glu_on_bipolar_release], [1.0]),
+        t
+    )
     gly_a2_release = u_a2[idxs.A2_GLY_INDEX]
 
     # Ganglion cell (receives excitatory bipolar and inhibitory A2 amacrine drive)
     glu_gc_exc = glu_on_bipolar_release + glu_off_bipolar_release
-    ganglion_model!(du_gc, u_gc, (params.GANGLION_PARAMS, glu_gc_exc, gly_a2_release), t)
+    ganglion_model!(
+        du_gc, u_gc,
+        (params.GANGLION_PARAMS, [glu_on_bipolar_release, glu_off_bipolar_release], [1.0, 1.0], [gly_a2_release], [1.0]),
+        t
+    )
 
     #Electrical coupling between cells
     gap_junction_coupling(du_a2[1], u_a2[1], du_on_bipolar[1], u_on_bipolar[1], params.A2_AMACRINE_PARAMS.C_m, params.ON_BIPOLAR_PARAMS.C_m, params.A2_AMACRINE_PARAMS.g_gap)
