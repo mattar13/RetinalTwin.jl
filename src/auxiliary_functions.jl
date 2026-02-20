@@ -16,6 +16,46 @@ end
     return xn / (K^n + xn + eps())
 end
 
+"""
+    spatial_synaptic(release_sites, weights, params, relation, K_key, n_key)
+
+Compute weighted-average channel activation across presynaptic release sites.
+`relation` is one of `:hill` or `:inv_hill`; `K_key`/`n_key` select fields in `params`.
+"""
+function spatial_synaptic(
+    release_sites::AbstractVector,
+    weights::AbstractVector,
+    params,
+    relation::Symbol,
+    K_key::Symbol,
+    n_key::Symbol
+)
+    length(release_sites) == length(weights) || error(
+        "spatial_synaptic: release_sites and weights must have same length"
+    )
+    isempty(release_sites) && return 0.0
+
+    wsum = sum(weights)
+    wsum <= 0 && return 0.0
+
+    K = getproperty(params, K_key)
+    n = getproperty(params, n_key)
+
+    acc = 0.0
+    @inbounds for i in eachindex(release_sites, weights)
+        x = max(release_sites[i], 0.0)
+        a = if relation == :hill
+            hill(x, K, n)
+        elseif relation == :inv_hill
+            1.0 / (1.0 + (x / K)^n)
+        else
+            error("spatial_synaptic: unsupported relation $relation")
+        end
+        acc += weights[i] * a
+    end
+    return acc / (wsum + eps())
+end
+
 # Bipolar/amacrine release and receptor helpers
 @inline S_inf(glu_received, K_Glu, n_Glu) = 1.0 / (1.0 + (glu_received / K_Glu)^n_Glu)
 @inline R_inf(Ca, K_Release, n_Release) = (Ca^n_Release) / (K_Release^n_Release + Ca^n_Release + eps())

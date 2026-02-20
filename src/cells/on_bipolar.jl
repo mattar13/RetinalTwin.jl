@@ -34,10 +34,10 @@ n_ONBC_STATES = length(ONBC_IC_MAP)
 Morris-Lecar ON bipolar cell model with mGluR6 sign inversion.
 """
 function on_bipolar_model!(du, u, p, t)
-    params, glu_received = p
+    params, glu_in, w_glu_in = p
     V, n, h, c, S, G = u
 
-    S_INF = S_inf(max(glu_received, 0.0), params.K_Glu, params.n_Glu)
+    S_INF = spatial_synaptic(glu_in, w_glu_in, params, :inv_hill, :K_Glu, :n_Glu)
     dS = (params.a_S * S_INF - S) / params.tau_S
 
     n_inf = gate_inf(V, params.Vn_half, params.kn_slope)

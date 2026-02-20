@@ -36,13 +36,13 @@ n_A2_STATES = length(A2_IC_MAP)
 Morris-Lecar A2 (AII) amacrine cell model.
 """
 function a2_model!(du, u, p, t)
-    params, glu_received = p
+    params, glu_in, w_glu_in = p
     V, n, h, c, A, D, Y = u
 
-    A_INF = A_inf(glu_received, params.K_a, params.n_a)
+    A_INF = spatial_synaptic(glu_in, w_glu_in, params, :hill, :K_a, :n_a)
     dA = (params.a_a * A_INF - A) / params.tau_A
 
-    D_INF = D_inf(glu_received, params.K_d, params.n_d)
+    D_INF = spatial_synaptic(glu_in, w_glu_in, params, :inv_hill, :K_d, :n_d)
     dD = (params.a_d * D_INF - D) / params.tau_d
 
     open_iGluR = A * D

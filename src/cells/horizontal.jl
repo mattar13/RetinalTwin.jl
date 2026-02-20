@@ -31,11 +31,10 @@ Horizontal cell model with static/single-state AMPA-KA-like excitation,
 Kir and BK currents, and Ca-driven GABA-release proxy.
 """
 function horizontal_model!(du, u, p, t)
-    params, I_ext, I_gap, glu_mean = p
+    params, I_gap, glu_in, w_glu_in = p
     V, c, I = u
 
-    # Stage-1 robust glutamatergic drive: static Hill activation.
-    s_inf = hill(max(glu_mean, 0.0), params.K_Glu, params.n_Glu)
+    s_inf = spatial_synaptic(glu_in, w_glu_in, params, :hill, :K_Glu, :n_Glu)
 
     I_L = params.g_L * (V - params.E_L)
     I_exc = params.g_exc * s_inf * (V - params.E_exc)
@@ -55,7 +54,7 @@ function horizontal_model!(du, u, p, t)
     I_inf = params.a_Release * R_inf(c, params.K_Release, params.n_Release)
     dI = (I_inf - I) / max(params.tau_Release, 1e-6)
 
-    dV = (-I_L - I_exc - I_CaL - I_Kir - I_BK + I_ext + I_gap + params.I_app) / params.C_m
+    dV = (-I_L - I_exc - I_CaL - I_Kir - I_BK + I_gap + params.I_app) / params.C_m
 
     du .= (dV, dc, dI)
     return nothing

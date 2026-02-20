@@ -2,24 +2,6 @@
 # rpe.jl - Retinal Pigment Epithelium
 # ============================================================
 
-# ── State indices ───────────────────────────────────────────
-
-const RPE_STATE_VARS = 2
-const RPE_V_INDEX = 1
-const RPE_K_SUB_INDEX = 2
-
-# ── 1. Default Parameters ───────────────────────────────────
-
-"""
-    default_rpe_params()
-
-Return default parameters for the RPE cell model as a named tuple.
-Parameters are loaded from rpe_params.csv.
-"""
-function default_rpe_params()
-    return default_rpe_params_csv()
-end
-
 # ── 2. Initial Conditions ───────────────────────────────────
 
 """

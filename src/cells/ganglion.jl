@@ -37,11 +37,11 @@ n_GC_STATES = length(GC_IC_MAP)
 Hodgkin-Huxley style ganglion cell model.
 """
 function ganglion_model!(du, u, p, t)
-    params, glu_in, gly_in = p
+    params, glu_in, w_glu_in, gly_in, w_gly_in = p
     V, m, h, n, sE, sI = u
 
-    sE_inf = hill(glu_in, params.K_preE, params.n_preE)
-    sI_inf = hill(gly_in, params.K_preI, params.n_preI)
+    sE_inf = spatial_synaptic(glu_in, w_glu_in, params, :hill, :K_preE, :n_preE)
+    sI_inf = spatial_synaptic(gly_in, w_gly_in, params, :hill, :K_preI, :n_preI)
 
     dsE = (params.a_preE * sE_inf - sE) / params.tau_E
     dsI = (params.a_preI * sI_inf - sI) / params.tau_I
