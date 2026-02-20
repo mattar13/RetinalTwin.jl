@@ -142,3 +142,60 @@ open(csv_path, "w") do io
     end
 end
 println("Saved IR summary CSV: ", csv_path)
+
+#%% --------- Hill fits for each cell IR curve ---------
+fit_rows = NamedTuple[]
+for (j, nm) in enumerate(names)
+    y = peak_dv[:, j]
+    fit = fit_hill_ir(intensity_levels, y)
+    push!(fit_rows, (cell=nm, cell_type=cell_types[j], A=fit.A, K=fit.K, n=fit.n, sse=fit.sse, ok=fit.ok))
+end
+
+fit_csv_path = joinpath(@__DIR__, "data", "uniform_flash_ir_hill_fits.csv")
+open(fit_csv_path, "w") do io
+    println(io, "cell,cell_type,A,K_Ihalf,n,sse,ok")
+    for r in fit_rows
+        println(io, "$(r.cell),$(r.cell_type),$(r.A),$(r.K),$(r.n),$(r.sse),$(r.ok)")
+    end
+end
+println("Saved Hill fit CSV: ", fit_csv_path)
+
+n_types = length(present_types)
+n_cols = ceil(Int, sqrt(n_types))
+n_rows = ceil(Int, n_types / n_cols)
+fig_fit = Figure(size=(520 * n_cols, 420 * n_rows))
+I_fit = exp10.(range(log10(minimum(intensity_levels)), log10(maximum(intensity_levels)); length=300))
+
+for (k, ct) in enumerate(present_types)
+    r = ceil(Int, k / n_cols)
+    c = mod1(k, n_cols)
+    ax_fit = Axis(
+        fig_fit[r, c],
+        xlabel="Flash intensity (photon flux)",
+        ylabel="Peak |dV| (mV)",
+        xscale=log10,
+        title="IR Hill Fits: $(ct)",
+    )
+
+    idx = findall(==(ct), cell_types)
+    cols = cgrad(:viridis, max(length(idx), 2), categorical=true)
+    for (m, j) in enumerate(idx)
+        nm = names[j]
+        y = peak_dv[:, j]
+        fit = fit_rows[j]
+        scatter!(ax_fit, intensity_levels, y, color=cols[m], markersize=7)
+        if fit.ok
+            y_fit = [hill_ir(Ii, fit.A, fit.K, fit.n) for Ii in I_fit]
+            lbl = "$(nm): K=$(round(fit.K, sigdigits=3)), n=$(round(fit.n, sigdigits=3))"
+            lines!(ax_fit, I_fit, y_fit, color=cols[m], linewidth=2.5, label=lbl)
+        else
+            lines!(ax_fit, intensity_levels, y, color=cols[m], linewidth=1.5, linestyle=:dash, label="$(nm): fit failed")
+        end
+    end
+    axislegend(ax_fit, position=:rb)
+end
+
+fit_plot_path = joinpath(@__DIR__, "plots", "uniform_flash_ir_hill_fits_by_type.png")
+save(fit_plot_path, fig_fit)
+display(fig_fit)
+println("Saved Hill fit subplot figure: ", fit_plot_path)
