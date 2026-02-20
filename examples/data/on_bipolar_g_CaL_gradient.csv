@@ -1,0 +1,4 @@
+celltype,param,value,k_gradient,n_gradiend,rmax_gradient
+ONBC,g_CaL,0.8,0.0,0.0,-0.5720695587569935
+A2,g_CaL,0.8,0.0,0.0,3.949281364498347
+GC,g_CaL,0.8,2.230457603073988,0.0,-1258.6311263680159
