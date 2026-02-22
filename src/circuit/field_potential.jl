@@ -1,154 +1,215 @@
-# ============================================================
-# field_potential.jl — ERG computation and OP extraction
-# Spec §5, §7.7, Appendix B
-# This will be a major rework of course...
-# ============================================================
-
-using DSP
-using FFTW
+using CSV
 
 """
-    compute_erg(sol, col::RetinalColumn, sidx::StateIndex)
+    default_depth_csv_path()
 
-Compute ERG field potential and per-component decomposition from ODE solution.
-Returns (erg::Vector{Float64}, components::Dict{Symbol, Vector{Float64}}).
+Default ERG channel-depth CSV.
 """
-function compute_erg(sol, col::RetinalColumn, sidx::StateIndex)
-    n_t = length(sol.t)
-    p = col.pop
-    w = col.erg_weights
+default_depth_csv_path() = normpath(joinpath(@__DIR__, "..", "parameters", "erg_depth_map.csv"))
 
-    erg = zeros(n_t)
-    components = Dict{Symbol, Vector{Float64}}(
-        :a_wave   => zeros(n_t),
-        :b_wave   => zeros(n_t),
-        :d_wave   => zeros(n_t),
-        :OPs      => zeros(n_t),
-        :P3       => zeros(n_t),
-        :c_wave   => zeros(n_t),
-        :ganglion => zeros(n_t),
-    )
+"""
+    load_erg_depth_map(csv_path=default_depth_csv_path())
 
-    for ti in 2:n_t
-        u      = sol.u[ti]
-        u_prev = sol.u[ti - 1]
-        dt     = sol.t[ti] - sol.t[ti - 1]
+Load rows from `erg_depth_map.csv`.
+Expected columns: `cell_type,current,z` and optional `weight`.
+"""
+function load_erg_depth_map(csv_path::AbstractString=default_depth_csv_path())
+    rows = CSV.File(csv_path)
+    out = NamedTuple[]
 
-        if dt <= 0.0
-            continue
-        end
+    for row in rows
+        cell_type = hasproperty(row, :cell_type) ? String(getproperty(row, :cell_type)) :
+                    (hasproperty(row, :CellType) ? String(getproperty(row, :CellType)) :
+                     error("Missing `cell_type` column in $csv_path"))
+        current = hasproperty(row, :current) ? String(getproperty(row, :current)) :
+                  (hasproperty(row, :Current) ? String(getproperty(row, :Current)) :
+                   error("Missing `current` column in $csv_path"))
+        z = hasproperty(row, :z) ? Float64(getproperty(row, :z)) :
+            (hasproperty(row, :Z) ? Float64(getproperty(row, :Z)) :
+             error("Missing `z` column in $csv_path"))
+        weight = hasproperty(row, :weight) ? Float64(getproperty(row, :weight)) :
+                 (hasproperty(row, :Weight) ? Float64(getproperty(row, :Weight)) : 1.0)
 
-        # Transmembrane current ≈ C_m * dV/dt for each cell type
-
-        # --- Photoreceptors (a-wave) ---
-        I_rod = 0.0
-        for i in 1:p.n_rod
-            offset = sidx.rod[1] + (i - 1) * ROD_STATE_VARS + (ROD_V_INDEX - 1)
-            I_rod += col.rod_params.C_m * (u[offset] - u_prev[offset]) / dt
-        end
-        I_cone = 0.0
-        for i in 1:p.n_cone
-            offset = sidx.cone[1] + (i - 1) * CONE_STATE_VARS + (CONE_V_INDEX - 1)
-            I_cone += col.cone_params.C_m * (u[offset] - u_prev[offset]) / dt
-        end
-        pr_contrib = w.rod * I_rod + w.cone * I_cone
-        components[:a_wave][ti] = pr_contrib
-
-        # --- ON-Bipolar (b-wave) ---
-        I_on = 0.0
-        for i in 1:p.n_on
-            offset = sidx.on_bc[1] + (i - 1) * 4  # V is var 1 (0-indexed: +0)
-            I_on += col.on_params.C_m * (u[offset] - u_prev[offset]) / dt
-        end
-        b_contrib = w.on_bc * I_on
-        components[:b_wave][ti] = b_contrib
-
-        # --- OFF-Bipolar (d-wave) ---
-        I_off = 0.0
-        for i in 1:p.n_off
-            offset = sidx.off_bc[1] + (i - 1) * 4
-            I_off += col.off_params.C_m * (u[offset] - u_prev[offset]) / dt
-        end
-        d_contrib = w.off_bc * I_off
-        components[:d_wave][ti] = d_contrib
-
-        # --- Amacrine OPs ---
-        I_a2 = 0.0
-        for i in 1:p.n_a2
-            offset = sidx.a2[1] + (i - 1) * 3
-            I_a2 += col.a2_params.C_m * (u[offset] - u_prev[offset]) / dt
-        end
-        I_gaba = 0.0
-        for i in 1:p.n_gaba
-            offset = sidx.gaba_ac[1] + (i - 1) * 3
-            I_gaba += col.gaba_params.C_m * (u[offset] - u_prev[offset]) / dt
-        end
-        op_contrib = w.a2 * I_a2 + w.gaba * I_gaba
-        components[:OPs][ti] = op_contrib
-
-        # --- Müller glia (P3) ---
-        I_muller = 0.0
-        for i in 1:p.n_muller
-            offset = sidx.muller[1] + (i - 1) * 4
-            I_muller += col.muller_params.C_m * (u[offset] - u_prev[offset]) / dt
-        end
-        p3_contrib = w.muller * I_muller
-        components[:P3][ti] = p3_contrib
-
-        # --- RPE (c-wave) ---
-        I_rpe = 0.0
-        for i in 1:p.n_rpe
-            offset = sidx.rpe[1] + (i - 1) * 2
-            # RPE tau is very large, so dV/dt is small; use the actual RPE current instead
-            rpe_u = view(u, offset:offset+1)
-            I_rpe += rpe_transmembrane_current(rpe_u, col.rpe_params)
-        end
-        c_contrib = w.rpe * I_rpe
-        components[:c_wave][ti] = c_contrib
-
-        # --- Ganglion ---
-        I_gc = 0.0
-        for i in 1:p.n_gc
-            offset = sidx.gc[1] + (i - 1) * 2
-            I_gc += col.gc_params.C_m * (u[offset] - u_prev[offset]) / dt
-        end
-        gc_contrib = w.gc * I_gc
-        components[:ganglion][ti] = gc_contrib
-
-        # Total ERG
-        erg[ti] = pr_contrib + b_contrib + d_contrib + op_contrib +
-                  p3_contrib + c_contrib + gc_contrib
+        push!(out, (cell_type=lowercase(strip(cell_type)), current=Symbol(strip(current)), z=z, weight=weight))
     end
+    return out
+end
 
-    # Copy first sample from second to avoid initial spike
-    if n_t >= 2
-        erg[1] = erg[2]
-        for (k, v) in components
-            v[1] = v[2]
+# Back-compat name.
+load_depth_map(csv_path::AbstractString=default_depth_csv_path()) = load_erg_depth_map(csv_path)
+load_depth_scales(csv_path::AbstractString=default_depth_csv_path()) = load_erg_depth_map(csv_path)
+
+@inline function _cell_type_label(cell_type::Symbol)
+    if cell_type == :PC
+        return "photoreceptor"
+    elseif cell_type == :HC
+        return "horizontal"
+    elseif cell_type == :ONBC
+        return "on_bipolar"
+    elseif cell_type == :OFFBC
+        return "off_bipolar"
+    elseif cell_type == :A2
+        return "a2_amacrine"
+    elseif cell_type == :GC
+        return "ganglion"
+    elseif cell_type == :MG
+        return "muller"
+    elseif cell_type == :RPE
+        return "rpe"
+    elseif cell_type == :GABA
+        return "gaba_amacrine"
+    elseif cell_type == :DA
+        return "da_amacrine"
+    else
+        return lowercase(String(cell_type))
+    end
+end
+
+@inline function _depth_scale(depth_rows, cell_type::Symbol, current::Symbol)
+    target_cell = _cell_type_label(cell_type)
+    for r in depth_rows
+        if r.cell_type == target_cell && r.current == current
+            return r.weight
         end
     end
-
-    return erg, components
+    return 1.0
 end
 
 """
-    extract_ops(erg, t; low=75.0, high=300.0)
+    compute_field_potential(model, sol; depth_csv=default_depth_csv_path(), params=default_retinal_params())
 
-Extract oscillatory potentials via bandpass filtering.
-Returns (ops_filtered, t) for the full time range.
+Post-simulation transretinal field potential by summing every per-channel
+current contribution scaled by channel depth from `erg_depth_map.csv`.
 """
-function extract_ops(erg::Vector{Float64}, t::Vector{Float64};
-                     low::Float64=75.0, high::Float64=300.0)
-    dt = t[2] - t[1]  # ms
-    fs = 1000.0 / dt   # Hz (convert from ms to seconds)
+function compute_field_potential(model::RetinalColumnModel, params::NamedTuple, sol;
+    depth_csv::AbstractString=default_depth_csv_path()
+)
+    depth_rows = load_erg_depth_map(depth_csv)
+    t = collect(sol.t)
+    nt = length(t)
+    field_potential = zeros(nt)
 
-    # Bandpass filter 75-300 Hz, 4th order Butterworth
-    responsetype = Bandpass(low, high; fs=fs)
-    designmethod = Butterworth(4)
-    bp = digitalfilter(responsetype, designmethod)
+    ordered = sort!(collect(values(model.cells)), by=cell -> cell.offset)
 
-    # Apply zero-phase filter
-    ops = filtfilt(bp, erg)
+    for i in 1:nt
+        ui = sol.u[i]
+        total = 0.0
 
-    return ops
+        for cell in ordered
+            uc = uview(ui, cell)
+            V = uc[cell.outidx.V]
+
+            if cell.cell_type == :PC
+                p = params.PHOTORECEPTOR_PARAMS
+                G = uc[PC_IC_MAP.G]
+                HO_sum = uc[PC_IC_MAP.HO1] + uc[PC_IC_MAP.HO2] + uc[PC_IC_MAP.HO3]
+                mKv = uc[PC_IC_MAP.mKv]
+                hKv = uc[PC_IC_MAP.hKv]
+                mCa = uc[PC_IC_MAP.mCa]
+                mKCa = uc[PC_IC_MAP.mKCa]
+                Ca_s = uc[PC_IC_MAP.Ca_s]
+
+                total += _depth_scale(depth_rows, :PC, :I_photo) * photoreceptor_I_photo(V, G, p)
+                total += _depth_scale(depth_rows, :PC, :I_leak) * photoreceptor_I_leak(V, p)
+                total += _depth_scale(depth_rows, :PC, :I_h) * photoreceptor_I_h(V, HO_sum, p)
+                total += _depth_scale(depth_rows, :PC, :I_kv) * photoreceptor_I_kv(V, mKv, hKv, p)
+                total += _depth_scale(depth_rows, :PC, :I_ca) * photoreceptor_I_ca(V, mCa, Ca_s, p)
+                total += _depth_scale(depth_rows, :PC, :I_kca) * photoreceptor_I_kca(V, mKCa, Ca_s, p)
+                total += _depth_scale(depth_rows, :PC, :I_cl) * photoreceptor_I_cl(V, Ca_s, p)
+                total += _depth_scale(depth_rows, :PC, :I_ex) * photoreceptor_I_ex(V, Ca_s, p)
+                total += _depth_scale(depth_rows, :PC, :I_ex2) * photoreceptor_I_ex2(Ca_s, p)
+
+            elseif cell.cell_type == :HC
+                p = params.HORIZONTAL_PARAMS
+                c = uc[HC_IC_MAP.c]
+                inputs = get(model.connections, cell.name, Tuple{Symbol,Symbol,Float64}[])
+                glu_in = [get_out(ui, model.cells[pre], key) for (pre, key, _) in inputs if key == :Glu]
+                w_glu_in = [w for (_, key, w) in inputs if key == :Glu]
+                s_inf = spatial_synaptic(glu_in, w_glu_in, p, :hill, :K_Glu, :n_Glu)
+                mCa = gate_inf(V, p.Vm_half, p.km_slope)
+
+                total += _depth_scale(depth_rows, :HC, :I_leak) * horizontal_I_leak(V, p)
+                total += _depth_scale(depth_rows, :HC, :I_exc) * horizontal_I_exc(V, s_inf, p)
+                total += _depth_scale(depth_rows, :HC, :I_cal) * horizontal_I_cal(V, mCa, p)
+                total += _depth_scale(depth_rows, :HC, :I_kir) * horizontal_I_kir(V, p)
+                total += _depth_scale(depth_rows, :HC, :I_bk) * horizontal_I_bk(V, c, p)
+
+            elseif cell.cell_type == :ONBC
+                p = params.ON_BIPOLAR_PARAMS
+                n = uc[ONBC_IC_MAP.n]
+                h = uc[ONBC_IC_MAP.h]
+                c = uc[ONBC_IC_MAP.c]
+                S = uc[ONBC_IC_MAP.S]
+                m = gate_inf(V, p.Vm_half, p.km_slope)
+
+                total += _depth_scale(depth_rows, :ONBC, :I_leak) * on_bipolar_I_leak(V, p)
+                total += _depth_scale(depth_rows, :ONBC, :I_trpm1) * on_bipolar_I_trpm1(V, S, p)
+                total += _depth_scale(depth_rows, :ONBC, :I_kv) * on_bipolar_I_kv(V, n, p)
+                total += _depth_scale(depth_rows, :ONBC, :I_h) * on_bipolar_I_h(V, h, p)
+                total += _depth_scale(depth_rows, :ONBC, :I_cal) * on_bipolar_I_cal(V, m, p)
+                total += _depth_scale(depth_rows, :ONBC, :I_kca) * on_bipolar_I_kca(V, c, p)
+
+            elseif cell.cell_type == :OFFBC
+                p = params.OFF_BIPOLAR_PARAMS
+                n = uc[OFFBC_IC_MAP.n]
+                h = uc[OFFBC_IC_MAP.h]
+                c = uc[OFFBC_IC_MAP.c]
+                A = uc[OFFBC_IC_MAP.A]
+                D = uc[OFFBC_IC_MAP.D]
+                m = gate_inf(V, p.Vm_half, p.km_slope)
+
+                total += _depth_scale(depth_rows, :OFFBC, :I_leak) * off_bipolar_I_leak(V, p)
+                total += _depth_scale(depth_rows, :OFFBC, :I_iglu) * off_bipolar_I_iglu(V, A, D, p)
+                total += _depth_scale(depth_rows, :OFFBC, :I_kv) * off_bipolar_I_kv(V, n, p)
+                total += _depth_scale(depth_rows, :OFFBC, :I_h) * off_bipolar_I_h(V, h, p)
+                total += _depth_scale(depth_rows, :OFFBC, :I_cal) * off_bipolar_I_cal(V, m, p)
+                total += _depth_scale(depth_rows, :OFFBC, :I_kca) * off_bipolar_I_kca(V, c, p)
+
+            elseif cell.cell_type == :A2
+                p = params.A2_AMACRINE_PARAMS
+                n = uc[A2_IC_MAP.n]
+                h = uc[A2_IC_MAP.h]
+                c = uc[A2_IC_MAP.c]
+                A = uc[A2_IC_MAP.A]
+                D = uc[A2_IC_MAP.D]
+                m = gate_inf(V, p.Vm_half, p.km_slope)
+
+                total += _depth_scale(depth_rows, :A2, :I_leak) * a2_amacrine_I_leak(V, p)
+                total += _depth_scale(depth_rows, :A2, :I_iglu) * a2_amacrine_I_iglu(V, A, D, p)
+                total += _depth_scale(depth_rows, :A2, :I_kv) * a2_amacrine_I_kv(V, n, p)
+                total += _depth_scale(depth_rows, :A2, :I_h) * a2_amacrine_I_h(V, h, p)
+                total += _depth_scale(depth_rows, :A2, :I_cal) * a2_amacrine_I_cal(V, m, p)
+                total += _depth_scale(depth_rows, :A2, :I_kca) * a2_amacrine_I_kca(V, c, p)
+
+            elseif cell.cell_type == :GC
+                p = params.GANGLION_PARAMS
+                m = uc[GC_IC_MAP.m]
+                h = uc[GC_IC_MAP.h]
+                n = uc[GC_IC_MAP.n]
+                sE = uc[GC_IC_MAP.sE]
+                sI = uc[GC_IC_MAP.sI]
+
+                total += _depth_scale(depth_rows, :GC, :I_leak) * ganglion_I_leak(V, p)
+                total += _depth_scale(depth_rows, :GC, :I_na) * ganglion_I_na(V, m, h, p)
+                total += _depth_scale(depth_rows, :GC, :I_k) * ganglion_I_k(V, n, p)
+                total += _depth_scale(depth_rows, :GC, :I_exc) * ganglion_I_exc(V, sE, p)
+                total += _depth_scale(depth_rows, :GC, :I_inh) * ganglion_I_inh(V, sI, p)
+
+            elseif cell.cell_type == :MG
+                p = params.MULLER_PARAMS
+                K_o_end = uc[MG_IC_MAP.K_o_end]
+                K_o_stalk = uc[MG_IC_MAP.K_o_stalk]
+                Glu_o = uc[MG_IC_MAP.Glu_o]
+
+                total += _depth_scale(depth_rows, :MG, :I_kir_end) * muller_I_kir_end(V, K_o_end, p)
+                total += _depth_scale(depth_rows, :MG, :I_kir_stalk) * muller_I_kir_stalk(V, K_o_stalk, p)
+                total += _depth_scale(depth_rows, :MG, :I_leak) * muller_I_leak(V, p)
+                total += _depth_scale(depth_rows, :MG, :I_eaat) * muller_I_eaat(Glu_o, p)
+            end
+        end
+
+        field_potential[i] = total
+    end
+    field_potential = field_potential .- field_potential[1] #Calculate DC offset
+    return t, field_potential
 end

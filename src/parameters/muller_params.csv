@@ -23,6 +23,7 @@ tau_K_diffusion,200.0,20.0,2000.0,Time constant for ECS K relaxation (ms)
 
 V_max_EAAT,0.8,0.0,10.0,Maximum glutamate uptake rate (µM/ms or proxy units)
 K_m_EAAT,10.0,0.1,100.0,EAAT half-saturation constant (µM or proxy)
+n_EAAT,2.0,0.5,6.0,EAAT Hill coefficient for glutamate uptake nonlinearity
 g_EAAT,0.001,0.0,0.01,EAAT conductance (nS)
 
 dt_guard,0.1,0.001,1.0,Time step guard for log-domain safety (ms)

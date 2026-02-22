@@ -1,0 +1,51 @@
+cell_type,current,z,weight,layer,notes
+photoreceptor,I_photo,1.00,-1.00,OS,CNG/phototransduction current
+photoreceptor,I_leak,0.85,-0.70,IS/ONL,soma leak
+photoreceptor,I_h,0.85,-0.70,IS,HCN in inner segment
+photoreceptor,I_kv,0.85,-0.70,IS,Kv in inner segment
+photoreceptor,I_ca,0.72,-0.44,OPL,L-type Ca at synaptic terminal
+photoreceptor,I_kca,0.72,-0.44,OPL,Ca-activated K at terminal
+photoreceptor,I_cl,0.72,-0.44,OPL,Ca-activated Cl at terminal
+photoreceptor,I_ex,0.85,-0.70,IS,Na/Ca exchanger inner segment
+photoreceptor,I_ex2,0.85,-0.70,IS,PMCA pump inner segment
+horizontal,I_leak,0.70,-0.40,OPL,soma in OPL
+horizontal,I_exc,0.70,-0.40,OPL,glutamatergic input at OPL
+horizontal,I_cal,0.70,-0.40,OPL,L-type Ca at OPL
+horizontal,I_kir,0.70,-0.40,OPL,Kir at OPL
+horizontal,I_bk,0.70,-0.40,OPL,BK at OPL
+on_bipolar,I_leak,0.55,-0.10,INL,soma in INL
+on_bipolar,I_trpm1,0.70,-0.40,OPL,dendritic mGluR6/TRPM1
+on_bipolar,I_kv,0.55,-0.10,INL,Kv at soma
+on_bipolar,I_h,0.65,-0.30,OPL/INL,HCN dendrites
+on_bipolar,I_cal,0.25,0.50,IPLi,L-type Ca at axon terminal inner IPL
+on_bipolar,I_kca,0.25,0.50,IPLi,Ca-activated K at axon terminal
+off_bipolar,I_leak,0.55,-0.10,INL,soma in INL
+off_bipolar,I_iglu,0.70,-0.40,OPL,iGluR dendritic input
+off_bipolar,I_kv,0.55,-0.10,INL,Kv at soma
+off_bipolar,I_h,0.65,-0.30,OPL/INL,HCN dendrites
+off_bipolar,I_cal,0.38,0.24,IPLo,L-type Ca at axon terminal outer IPL
+off_bipolar,I_kca,0.38,0.24,IPLo,Ca-activated K at axon terminal
+a2_amacrine,I_leak,0.45,0.10,INL/IPL,soma at INL/IPL border
+a2_amacrine,I_iglu,0.25,0.50,IPLi,glutamatergic input from ON bipolars
+a2_amacrine,I_kv,0.45,0.10,INL/IPL,Kv at soma
+a2_amacrine,I_h,0.45,0.10,INL/IPL,HCN at soma
+a2_amacrine,I_cal,0.38,0.24,IPLo,Ca at lobular appendages outer IPL
+a2_amacrine,I_kca,0.45,0.10,INL/IPL,KCa at soma
+gaba_amacrine,I_leak,0.35,0.30,IPL,soma/processes in IPL
+gaba_amacrine,I_ca,0.35,0.30,IPL,Ca in IPL
+gaba_amacrine,I_k,0.35,0.30,IPL,K in IPL
+da_amacrine,I_leak,0.45,0.10,INL/IPL,soma at INL/IPL border
+da_amacrine,I_ca,0.45,0.10,INL/IPL,Ca at processes
+da_amacrine,I_k,0.45,0.10,INL/IPL,K at soma
+ganglion,I_leak,0.10,0.80,GCL,soma in GCL
+ganglion,I_na,0.10,0.80,GCL,Nav at soma/axon hillock
+ganglion,I_k,0.10,0.80,GCL,Kdr at soma
+ganglion,I_exc,0.30,0.40,IPL,excitatory synaptic input in IPL
+ganglion,I_inh,0.30,0.40,IPL,inhibitory synaptic input in IPL
+muller,I_kir_end,0.00,1.00,ILM,Kir4.1 at endfoot
+muller,I_kir_stalk,0.55,-0.10,INL,Kir4.1 at stalk mid-retina
+muller,I_leak,0.55,-0.10,INL,leak distributed at soma level
+muller,I_eaat,0.65,-0.30,OPL/IPL,glutamate uptake at synaptic layers
+rpe,I_k_apical,0.95,-0.90,subretinal,K channels facing subretinal space
+rpe,I_cl_basal,1.00,-1.00,basal,Cl channels facing choroid
+rpe,I_leak,0.97,-0.94,RPE,distributed RPE leak
