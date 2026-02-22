@@ -61,6 +61,32 @@ const PC_IC_MAP = (
 n_PC_STATES = length(PC_IC_MAP)
 
 """
+    I_photoreceptor(V, params)
+
+Approximate total photoreceptor transmembrane current at voltage `V` using
+steady-state channel activation assumptions.
+"""
+function I_photoreceptor(V, params)
+    Ca_ref = 0.1
+    G_ref = 2.0
+    mKv_inf = gate_inf(V, -35.0, 8.0)
+    hKv_inf = gate_inf(V, -58.0, -8.0)
+    mCa_inf = gate_inf(V, -28.0, 6.0)
+    mKCa_inf = gate_inf(V, -32.0, 10.0)
+    h_open = gate_inf(V, -72.0, -8.0)
+
+    i_photo = photoreceptor_I_photo(V, G_ref, params)
+    i_leak = photoreceptor_I_leak(V, params)
+    i_h = photoreceptor_I_h(V, h_open, params)
+    i_kv = photoreceptor_I_kv(V, mKv_inf, hKv_inf, params)
+    i_ca = photoreceptor_I_ca(V, mCa_inf, Ca_ref, params)
+    i_kca = photoreceptor_I_kca(V, mKCa_inf, Ca_ref, params)
+    i_cl = photoreceptor_I_cl(V, Ca_ref, params)
+
+    return i_photo + i_leak + i_h + i_kv + i_ca + i_kca + i_cl
+end
+
+"""
     photoreceptor_model!(du, u, p, t)
 
 Biophysical rod photoreceptor model.
@@ -142,7 +168,7 @@ end
 
 Compute total K+ efflux from a rod photoreceptor.
 """
-function photoreceptor_K_efflux(u, params::NamedTuple)
+function photoreceptor_K_efflux(u, params)
     V = u[PC_IC_MAP.V]
     mKv = u[PC_IC_MAP.mKv]
     hKv = u[PC_IC_MAP.hKv]

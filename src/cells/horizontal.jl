@@ -25,6 +25,22 @@ const HC_IC_MAP = (
 n_HC_STATES = length(HC_IC_MAP)
 
 """
+    I_horizontal(V, params)
+
+Approximate total horizontal-cell transmembrane current at voltage `V` with
+steady-state gates and baseline calcium.
+"""
+function I_horizontal(V, params)
+    c_ref = max(params.Caref_BK, 1e-6)
+    mCa = gate_inf(V, params.Vm_half, params.km_slope)
+    I_L = horizontal_I_leak(V, params)
+    I_CaL = horizontal_I_cal(V, mCa, params)
+    I_Kir = horizontal_I_kir(V, params)
+    I_BK = horizontal_I_bk(V, c_ref, params)
+    return I_L + I_CaL + I_Kir + I_BK
+end
+
+"""
     horizontal_model!(du, u, p, t)
 
 Horizontal cell model with static/single-state AMPA-KA-like excitation,

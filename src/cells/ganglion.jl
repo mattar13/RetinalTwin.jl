@@ -32,6 +32,28 @@ const GC_IC_MAP = (
 n_GC_STATES = length(GC_IC_MAP)
 
 """
+    I_ganglion(V, params)
+
+Approximate total ganglion-cell transmembrane current at voltage `V` using
+steady-state Hodgkin-Huxley gates and no synaptic drive.
+"""
+function I_ganglion(V, params)
+    am, bm = alpha_beta_m(V)
+    ah, bh = alpha_beta_h(V)
+    an, bn = alpha_beta_n(V)
+
+    m_inf = am / (am + bm + eps())
+    h_inf = ah / (ah + bh + eps())
+    n_inf = an / (an + bn + eps())
+
+    I_L = params.g_L * (V - params.E_L)
+    I_Na = params.g_Na * (m_inf^3) * h_inf * (V - params.E_Na)
+    I_K = params.g_K * (n_inf^4) * (V - params.E_K)
+
+    return I_L + I_Na + I_K
+end
+
+"""
     ganglion_model!(du, u, p, t)
 
 Hodgkin-Huxley style ganglion cell model.

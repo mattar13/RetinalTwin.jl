@@ -30,26 +30,26 @@ end
 
 # ── 4. Mathematical Model ───────────────────────────────────
 
+# da_model!(du, u, p, t)
+# Morris-Lecar dopaminergic amacrine cell model.
+# State: u = [V, w, DA]
 """
-    da_model!(du, u, p, t)
+    I_da_amacrine(V, params)
 
-Morris-Lecar dopaminergic amacrine cell model.
-
-# Arguments
-- `du`: derivative vector (3 elements)
-- `u`: state vector (3 elements)
-- `p`: tuple `(params, I_exc)` where:
-  - `params`: named tuple from `default_da_params()`
-  - `I_exc`: excitatory synaptic current from ON-bipolars (pA)
-- `t`: time (ms)
-
-# State vector
-`u = [V, w, DA]`
-
-# Notes
-Modulatory cell with slow dopamine release (tau ~ 200 ms).
-Receives excitatory input from ON-bipolars.
+Approximate total dopaminergic amacrine transmembrane current at voltage `V`
+using steady-state Morris-Lecar gates.
 """
+function I_da_amacrine(V, params)
+    m_inf = m_inf_ml(V, params.V1, params.V2)
+    w_inf = w_inf_ml(V, params.V3, params.V4)
+
+    I_L = params.g_L * (V - params.E_L)
+    I_Ca = params.g_Ca * m_inf * (V - params.E_Ca)
+    I_K = params.g_K * w_inf * (V - params.E_K)
+
+    return I_L + I_Ca + I_K
+end
+
 function da_model!(du, u, p, t)
     params, I_exc = p
 

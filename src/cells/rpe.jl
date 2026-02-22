@@ -25,11 +25,24 @@ end
 # ── 3. Auxiliary Functions ──────────────────────────────────
 
 """
+    I_rpe(V, params)
+
+Approximate total RPE transmembrane current at voltage `V` using resting
+subretinal potassium.
+"""
+function I_rpe(V, params)
+    E_K_sub = nernst_K(params.K_sub_rest, params.K_i)
+    return params.g_K_apical * (V - E_K_sub) +
+           params.g_Cl_baso * (V - params.E_Cl) +
+           params.g_L_RPE * (V - params.E_L_RPE)
+end
+
+"""
     rpe_transmembrane_current(u, params)
 
 Compute RPE transmembrane current for ERG contribution.
 """
-function rpe_transmembrane_current(u, params::NamedTuple)
+function rpe_transmembrane_current(u, params)
     V_RPE = u[RPE_V_INDEX]
     K_sub = u[RPE_K_SUB_INDEX]
 

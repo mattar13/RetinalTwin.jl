@@ -26,11 +26,28 @@ const MG_IC_MAP = (
 n_MG_STATES = length(MG_IC_MAP)
 
 """
+    I_muller(V, params)
+
+Approximate total Muller transmembrane current at voltage `V` using resting K+
+for Kir reversal estimates.
+"""
+function I_muller(V, params)
+    E_K = nernst_K(params.K_o_rest, params.K_i)
+    r = kir_rect(V, E_K; Vshift=params.Kir_Vshift, k=params.Kir_k)
+
+    I_Kir_end = params.g_Kir_end * r * (V - E_K)
+    I_Kir_stalk = params.g_Kir_stalk * r * (V - E_K)
+    I_L = params.g_L * (V - params.E_L)
+
+    return I_Kir_end + I_Kir_stalk + I_L
+end
+
+"""
     muller_transmembrane_current(u, params)
 
 Compute total transmembrane current (for ERG contribution).
 """
-function muller_transmembrane_current(u, params::NamedTuple)
+function muller_transmembrane_current(u, params)
     V_M = u[MG_IC_MAP.V]
     K_o_end = u[MG_IC_MAP.K_o_end]
     K_o_stk = u[MG_IC_MAP.K_o_stalk]
@@ -87,7 +104,7 @@ function muller_model!(du, u, p, t)
     end
 
     Glu_o_clamped = max(Glu_o, 0.0)
-    J_uptake = params.V_max_EAAT * Glu_o_clamped / (params.K_m_EAAT + Glu_o_clamped + eps())
+    J_uptake = params.V_max_EAAT * hill(Glu_o_clamped, params.K_m_EAAT, params.n_EAAT)
     I_EAAT = -params.g_EAAT * J_uptake
 
     dV_M = (-(I_Kir_end + I_Kir_stalk + I_L + I_EAAT) + params.I_app) / params.C_m

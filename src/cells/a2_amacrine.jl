@@ -31,6 +31,31 @@ const A2_IC_MAP = (
 n_A2_STATES = length(A2_IC_MAP)
 
 """
+    I_a2_amacrine(V, params)
+
+Approximate total A2 amacrine transmembrane current at voltage `V` using
+steady-state gating and no presynaptic drive.
+"""
+function I_a2_amacrine(V, params)
+    n_inf = gate_inf(V, params.Vn_half, params.kn_slope)
+    h_inf = gate_inf(V, params.Vh_half, params.kh_slope)
+    m_inf = gate_inf(V, params.Vm_half, params.km_slope)
+
+    open_iGluR = 0.0
+    c_ref = 0.0
+    a_c = hill(max(c_ref, 0.0), params.K_c, params.n_c)
+
+    I_L = params.g_L * (V - params.E_L)
+    I_iGluR = params.g_iGluR * open_iGluR * (V - params.E_iGluR)
+    I_Kv = params.g_Kv * n_inf * (V - params.E_K)
+    I_h = params.g_h * h_inf * (V - params.E_h)
+    I_CaL = params.g_CaL * m_inf * (V - params.E_Ca)
+    I_KCa = params.g_KCa * a_c * (V - params.E_K)
+
+    return I_L + I_iGluR + I_Kv + I_h + I_CaL + I_KCa
+end
+
+"""
     a2_model!(du, u, p, t)
 
 Morris-Lecar A2 (AII) amacrine cell model.

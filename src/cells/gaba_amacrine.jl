@@ -28,28 +28,26 @@ end
 
 # ── 4. Mathematical Model ───────────────────────────────────
 
+# gaba_model!(du, u, p, t)
+# Morris-Lecar GABAergic amacrine cell model.
+# State: u = [V, w, GABA]
 """
-    gaba_model!(du, u, p, t)
+    I_gaba_amacrine(V, params)
 
-Morris-Lecar GABAergic amacrine cell model.
-
-# Arguments
-- `du`: derivative vector (3 elements)
-- `u`: state vector (3 elements)
-- `p`: tuple `(params, I_exc, I_inh, I_mod)` where:
-  - `params`: named tuple from `default_gaba_params()`
-  - `I_exc`: excitatory synaptic current from bipolars (pA)
-  - `I_inh`: inhibitory synaptic current (pA)
-  - `I_mod`: modulatory current (pA)
-- `t`: time (ms)
-
-# State vector
-`u = [V, w, GABA]`
-
-# Notes
-Forms reciprocal inhibitory network with A2 amacrines for oscillatory
-potential generation.
+Approximate total GABA amacrine transmembrane current at voltage `V` using
+steady-state Morris-Lecar gates.
 """
+function I_gaba_amacrine(V, params)
+    m_inf = m_inf_ml(V, params.V1, params.V2)
+    w_inf = w_inf_ml(V, params.V3, params.V4)
+
+    I_L = params.g_L * (V - params.E_L)
+    I_Ca = params.g_Ca * m_inf * (V - params.E_Ca)
+    I_K = params.g_K * w_inf * (V - params.E_K)
+
+    return I_L + I_Ca + I_K
+end
+
 function gaba_model!(du, u, p, t)
     params, I_exc, I_inh, I_mod = p
 

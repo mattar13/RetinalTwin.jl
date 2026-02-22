@@ -31,6 +31,31 @@ const OFFBC_IC_MAP = (
 n_OFFBC_STATES = length(OFFBC_IC_MAP)
 
 """
+    I_off_bipolar(V, params)
+
+Approximate total OFF-bipolar transmembrane current at voltage `V` using
+steady-state gating and no presynaptic drive.
+"""
+function I_off_bipolar(V, params)
+    n_inf = gate_inf(V, params.Vn_half, params.kn_slope)
+    h_inf = gate_inf(V, params.Vh_half, params.kh_slope)
+    m_inf = gate_inf(V, params.Vm_half, params.km_slope)
+
+    A_ref = 0.0
+    D_ref = 0.0
+    c_ref = 0.0
+
+    I_L = off_bipolar_I_leak(V, params)
+    I_iGluR = off_bipolar_I_iglu(V, A_ref, D_ref, params)
+    I_Kv = off_bipolar_I_kv(V, n_inf, params)
+    I_h = off_bipolar_I_h(V, h_inf, params)
+    I_CaL = off_bipolar_I_cal(V, m_inf, params)
+    I_KCa = off_bipolar_I_kca(V, c_ref, params)
+
+    return I_L + I_iGluR + I_Kv + I_h + I_CaL + I_KCa
+end
+
+"""
     off_bipolar_model!(du, u, p, t)
 
 Morris-Lecar OFF bipolar cell model with ionotropic glutamate receptor.

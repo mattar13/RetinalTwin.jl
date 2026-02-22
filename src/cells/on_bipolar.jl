@@ -29,6 +29,30 @@ const ONBC_IC_MAP = (
 n_ONBC_STATES = length(ONBC_IC_MAP)
 
 """
+    I_on_bipolar(V, params)
+
+Approximate total ON-bipolar transmembrane current at voltage `V` using
+steady-state gating and no presynaptic drive.
+"""
+function I_on_bipolar(V, params)
+    n_inf = gate_inf(V, params.Vn_half, params.kn_slope)
+    h_inf = gate_inf(V, params.Vh_half, params.kh_slope)
+    m_inf = gate_inf(V, params.Vm_half, params.km_slope)
+
+    s_ref = 0.0
+    c_ref = 0.0
+
+    I_L = on_bipolar_I_leak(V, params)
+    I_TRPM1 = on_bipolar_I_trpm1(V, s_ref, params)
+    I_Kv = on_bipolar_I_kv(V, n_inf, params)
+    I_h = on_bipolar_I_h(V, h_inf, params)
+    I_CaL = on_bipolar_I_cal(V, m_inf, params)
+    I_KCa = on_bipolar_I_kca(V, c_ref, params)
+
+    return I_L + I_TRPM1 + I_Kv + I_h + I_CaL + I_KCa
+end
+
+"""
     on_bipolar_model!(du, u, p, t)
 
 Morris-Lecar ON bipolar cell model with mGluR6 sign inversion.
