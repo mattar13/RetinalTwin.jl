@@ -37,16 +37,17 @@ NamedTuple with:
 - `OFF_BIPOLAR_PARAMS`: OFF bipolar cell parameters
 - `A2_AMACRINE_PARAMS`: A2 amacrine cell parameters
 """
-function default_retinal_params()
-    return (
-        PHOTORECEPTOR_PARAMS = default_rod_params(),
-        HORIZONTAL_PARAMS = default_hc_params(),
-        ON_BIPOLAR_PARAMS = default_on_bc_params(),
-        OFF_BIPOLAR_PARAMS = default_off_bc_params(),
-        A2_AMACRINE_PARAMS = default_a2_amacrine_params(),
-        GANGLION_PARAMS = default_gc_params(), 
-        MULLER_PARAMS = default_muller_params()
+function default_retinal_params(; editable::Bool=false)
+    params_nt = (
+        PHOTORECEPTOR_PARAMS = default_rod_params(; editable=false),
+        HORIZONTAL_PARAMS = default_hc_params(; editable=false),
+        ON_BIPOLAR_PARAMS = default_on_bc_params(; editable=false),
+        OFF_BIPOLAR_PARAMS = default_off_bc_params(; editable=false),
+        A2_AMACRINE_PARAMS = default_a2_amacrine_params(; editable=false),
+        GANGLION_PARAMS = default_gc_params(; editable=false),
+        MULLER_PARAMS = default_muller_params(; editable=false)
     )
+    return editable ? namedtuple_to_dict(params_nt) : params_nt
 end
 
 # ── Initial conditions ──────────────────────────────────────
@@ -63,6 +64,7 @@ Build initial conditions for photoreceptor + ON bipolar system.
 - 25-element state vector [photoreceptor(21), on_bipolar(6), off_bipolar(7), a2(7), ganglion(6), muller(4)]
 """
 function retinal_column_initial_conditions(params)
+    params = params isa AbstractDict ? dict_to_namedtuple(params) : params
     # Get individual cell initial conditions
     ic_size = 0
     u0_photoreceptor = photoreceptor_state(params.PHOTORECEPTOR_PARAMS)
@@ -112,6 +114,7 @@ end
 
 function (RCM::RetinalColumnModel)(du, u, p, t)
     params, stim_func = p
+    params = params isa AbstractDict ? dict_to_namedtuple(params) : params
 
     for cell in values(RCM.cells)
         if !(cell.cell_type in (:PC, :HC, :ONBC, :OFFBC, :A2, :GC, :MG))
@@ -244,6 +247,7 @@ u[35:41]  → A2 amacrine states [V, n, h, c, A, D, Gly_Release]
 """
 function retinal_column_model!(du, u, p, t)
     params, stim_func = p
+    params = params isa AbstractDict ? dict_to_namedtuple(params) : params
 
     idxs = DEFAULT_INDEXES
     # === Extract state segments using views (efficient, no copying) ===
