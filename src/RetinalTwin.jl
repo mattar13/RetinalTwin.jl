@@ -63,6 +63,7 @@ export
 include("solution_extraction_utils.jl")
 export
     ordered_cells,
+    ordered_cells_by_offset,
     ordered_cells_by_type,
     present_cell_types,
     calcium_spec,
