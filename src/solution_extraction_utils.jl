@@ -15,11 +15,11 @@ const RETINAL_CELL_TYPE_ORDER = sort(collect(keys(RETINAL_LAYER_DEPTH)), by=ct -
     return m === nothing ? 0 : parse(Int, m.match)
 end
 
-ordered_cells(model::RetinalColumnModel) =
+ordered_cells_by_offset(model::RetinalColumnModel) =
     sort!(collect(keys(model.cells)), by=nm -> model.cells[nm].offset)
 
 function ordered_cells_by_type(model::RetinalColumnModel; cell_type_order::AbstractVector{Symbol}=RETINAL_CELL_TYPE_ORDER)
-    names = ordered_cells(model)
+    names = ordered_cells_by_offset(model)
     rank = Dict(ct => i for (i, ct) in enumerate(cell_type_order))
     sort!(names, by=nm -> begin
         ct = model.cells[nm].cell_type
@@ -27,7 +27,9 @@ function ordered_cells_by_type(model::RetinalColumnModel; cell_type_order::Abstr
     end)
 end
 
-function present_cell_types(model::RetinalColumnModel; names::AbstractVector{Symbol}=ordered_cells_by_type(model))
+ordered_cells(model::RetinalColumnModel) = ordered_cells_by_type(model)
+
+function present_cell_types(model::RetinalColumnModel; names::AbstractVector{Symbol}=ordered_cells(model))
     types = Symbol[]
     for nm in names
         ct = model.cells[nm].cell_type
