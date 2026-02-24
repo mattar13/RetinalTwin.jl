@@ -2,8 +2,6 @@ using Revise
 using RetinalTwin
 using DifferentialEquations
 
-include("retinal_column_plotting.jl")
-
 println("=" ^ 60)
 println("RetinalColumnModel Example (Full Build)")
 println("=" ^ 60)

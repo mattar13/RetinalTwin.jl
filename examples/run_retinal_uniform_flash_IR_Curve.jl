@@ -4,8 +4,6 @@ using DifferentialEquations
 using Statistics
 using CairoMakie
 
-include("retinal_column_plotting.jl")
-
 println("=" ^ 60)
 println("RetinalColumnModel Example (Full Build)")
 println("=" ^ 60)
@@ -57,11 +55,6 @@ solutions = Vector{Any}(undef, nI)
 
 baseline_window = (stim_start - 50.0, stim_start)
 response_window = (stim_start, stim_end + 400.0)
-
-function finite_mean(x)
-    vals = [v for v in x if isfinite(v)]
-    return isempty(vals) ? NaN : mean(vals)
-end
 
 for (i, photon_flux) in enumerate(intensity_levels)
     selected_stimulus = RetinalTwin.make_uniform_flash_stimulus(
@@ -121,7 +114,7 @@ end
 
 for ct in present_types
     idx = findall(==(ct), cell_types)
-    y = [finite_mean(peak_dv[i, idx]) for i in 1:nI]
+    y = [finite_mean(@view peak_dv[i, idx]) for i in 1:nI]
     lines!(ax, intensity_levels, y, color=type_color[ct], linewidth=3, label=String(ct))
     scatter!(ax, intensity_levels, y, color=type_color[ct], markersize=10)
 end

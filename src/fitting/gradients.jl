@@ -10,15 +10,6 @@ const PARAM_BLOCK_TO_CELLTYPE = Dict(
     :MULLER_PARAMS => :MG,
 )
 
-_ordered_cells(model::RetinalColumnModel) = sort!(collect(keys(model.cells)), by=nm -> model.cells[nm].offset)
-_state_trace(sol, model::RetinalColumnModel, name::Symbol, key::Symbol) =
-    [get_out(ui, model.cells[name], key) for ui in sol.u]
-
-function _finite_mean(x)
-    vals = [v for v in x if isfinite(v)]
-    return isempty(vals) ? NaN : mean(vals)
-end
-
 function _parse_param_target(target)
     target === nothing && return nothing
     if target isa Tuple{Symbol,Symbol}
@@ -64,7 +55,7 @@ function _list_scalar_params(params)
 end
 
 function _resolve_output_groups(model::RetinalColumnModel, outputs)
-    names = _ordered_cells(model)
+    names = ordered_cells(model)
     name_to_idx = Dict(nm => i for (i, nm) in enumerate(names))
     cell_types = [model.cells[nm].cell_type for nm in names]
 
@@ -161,7 +152,7 @@ function _fit_ir_outputs(
         response_idx = findall(t -> response_window[1] <= t <= response_window[2], sol.t)
 
         for (j, nm) in enumerate(names)
-            v = _state_trace(sol, model, nm, :V)
+            v = state_trace(sol, model, nm, :V)
             if isempty(baseline_idx) || isempty(response_idx)
                 peak_dv[i, j] = NaN
                 continue
@@ -175,7 +166,7 @@ function _fit_ir_outputs(
     fits = Dict{String,NamedTuple}()
     for g in groups
         idx = g.idx
-        y = [_finite_mean(peak_dv[i, idx]) for i in 1:nI]
+        y = [finite_mean(@view peak_dv[i, idx]) for i in 1:nI]
         fits[g.label] = fit_hill_ir(intensity_levels, y)
     end
     return fits

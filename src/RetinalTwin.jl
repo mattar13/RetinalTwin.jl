@@ -59,6 +59,17 @@ export
     retinal_column_initial_conditions,
     retinal_column_model!
 
+# --- Solution extraction helpers ---
+include("solution_extraction_utils.jl")
+export
+    ordered_cells,
+    ordered_cells_by_type,
+    present_cell_types,
+    calcium_spec,
+    release_spec,
+    state_trace,
+    finite_mean
+
 # --- Stimulus protocols ---
 include("stimulus_protocols/single_flash.jl")
 include("stimulus_protocols/stimulus_protocols.jl")
@@ -77,6 +88,17 @@ export default_depth_csv_path, load_erg_depth_map, load_depth_map, load_depth_sc
 # --- Visualization ---
 include("visualization/plots.jl")
 include("visualization/gl_plots.jl")
+include("visualization/retinal_column_plotting.jl")
+export
+    plot_erg,
+    plot_cell_voltages,
+    plot_ops,
+    plot_intensity_response,
+    plot_erg_gl,
+    plot_cell_voltages_gl,
+    plot_phototransduction_breakdown,
+    plot_all_cells_v_ca_release,
+    plot_cell_layout_3d
 
 # --- Validation ---
 include("validation/targets.jl")

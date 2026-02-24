@@ -1,8 +1,6 @@
 using RetinalTwin
 using DifferentialEquations
 
-include(joinpath(@__DIR__, "retinal_column_plotting.jl"))
-
 println("=" ^ 60)
 println("RetinalColumnModel Example (Simple Build)")
 println("=" ^ 60)
