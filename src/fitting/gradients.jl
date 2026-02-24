@@ -55,7 +55,7 @@ function _list_scalar_params(params)
 end
 
 function _resolve_output_groups(model::RetinalColumnModel, outputs)
-    names = ordered_cells(model)
+    names = ordered_cells_by_offset(model)
     name_to_idx = Dict(nm => i for (i, nm) in enumerate(names))
     cell_types = [model.cells[nm].cell_type for nm in names]
 
