@@ -274,32 +274,22 @@ function _fit_stage(
 end
 
 function _parameter_bounds_from_csv(block::Symbol, name::Symbol, base::Float64)
-    csv_map = Dict(
-        :PHOTORECEPTOR_PARAMS => joinpath(@__DIR__, "..", "parameters", "photoreceptor_params.csv"),
-        :ON_BIPOLAR_PARAMS => joinpath(@__DIR__, "..", "parameters", "on_bipolar_params.csv"),
-        :A2_AMACRINE_PARAMS => joinpath(@__DIR__, "..", "parameters", "a2_amacrine_params.csv"),
-        :MULLER_PARAMS => joinpath(@__DIR__, "..", "parameters", "muller_params.csv"),
-    )
-    path = get(csv_map, block, nothing)
-    path === nothing && return (0.3 * base, 3.0 * max(base, 1e-4))
-
-    rows = CSV.File(path)
-    for row in rows
-        key = Symbol(strip(String(getproperty(row, :Key))))
-        if key == name
-            lo = hasproperty(row, :LowerBounds) ? tryparse(Float64, string(getproperty(row, :LowerBounds))) :
-                 (hasproperty(row, :LowerBound) ? tryparse(Float64, string(getproperty(row, :LowerBound))) : nothing)
-            hi = hasproperty(row, :UpperBounds) ? tryparse(Float64, string(getproperty(row, :UpperBounds))) :
-                 (hasproperty(row, :UpperBound) ? tryparse(Float64, string(getproperty(row, :UpperBound))) : nothing)
-            l = lo === nothing ? 0.3 * base : lo
-            u = hi === nothing ? 3.0 * max(base, 1e-4) : hi
-            if l == u
-                return (0.8 * l, 1.2 * u)
-            end
-            return (Float64(l), Float64(u))
+    spec = get_param_spec(block, name; csv_path=default_param_csv_path())
+    if spec !== nothing
+        l = spec.lower
+        u = spec.upper
+        if l == u
+            eps = max(abs(base) * 0.1, 1e-6)
+            return (l - eps, u + eps)
         end
+        return (Float64(l), Float64(u))
     end
     return (0.3 * base, 3.0 * max(base, 1e-4))
+end
+
+function _is_param_fixed(block::Symbol, name::Symbol)
+    spec = get_param_spec(block, name; csv_path=default_param_csv_path())
+    return spec === nothing ? false : spec.fixed
 end
 
 function make_target(params::NamedTuple, block::Symbol, name::Symbol)
@@ -339,6 +329,10 @@ function default_stages(params::NamedTuple; mode::Symbol=:efficient)
         make_target(params, :MULLER_PARAMS, :alpha_K),
         make_target(params, :MULLER_PARAMS, :tau_K_diffusion),
     ]
+    stageA_targets = filter(t -> !_is_param_fixed(t.block, t.name), stageA_targets)
+    stageB_targets = filter(t -> !_is_param_fixed(t.block, t.name), stageB_targets)
+    stageC_targets = filter(t -> !_is_param_fixed(t.block, t.name), stageC_targets)
+    stageD_targets = filter(t -> !_is_param_fixed(t.block, t.name), stageD_targets)
 
     return [
         StageDefinition(:A_awave, stageA_targets, (0.0, 40.0), :awave, 6 * mult, 4 * mult),

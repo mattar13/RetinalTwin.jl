@@ -2,29 +2,6 @@
 # retinal_column.jl — Retinal column model with direct coupling
 # ============================================================
 
-# ── State organization ──────────────────────────────────────
-
-DEFAULT_INDEXES = (
-    PC_ICS_ID_BEGIN = 1,
-    PC_ICS_ID_END = 21,
-    ONBC_ICS_ID_BEGIN = 22,
-    ONBC_ICS_ID_END = 27,
-    OFFBC_ICS_ID_BEGIN = 28,
-    OFFBC_ICS_ID_END = 34,
-    A2_ICS_ID_BEGIN = 35,
-    A2_ICS_ID_END = 41,
-    GC_ICS_ID_BEGIN = 42,
-    GC_ICS_ID_END = 47,
-    MULLER_ICS_ID_BEGIN = 48,
-    MULLER_ICS_ID_END = 51,
-    #Next we can define the neurotransmitter indices
-    PC_GLU_INDEX = 21,
-    ONBC_GLU_INDEX = 6,
-    OFFBC_GLU_INDEX = 7,
-    A2_GLY_INDEX = 7
-)
-# ── Default parameters ──────────────────────────────────────
-
 """
     default_retinal_params()
 
@@ -38,14 +15,15 @@ NamedTuple with:
 - `A2_AMACRINE_PARAMS`: A2 amacrine cell parameters
 """
 function default_retinal_params(; editable::Bool=false)
+    all_params = load_all_params(; editable=false)
     params_nt = (
-        PHOTORECEPTOR_PARAMS = default_rod_params(; editable=false),
-        HORIZONTAL_PARAMS = default_hc_params(; editable=false),
-        ON_BIPOLAR_PARAMS = default_on_bc_params(; editable=false),
-        OFF_BIPOLAR_PARAMS = default_off_bc_params(; editable=false),
-        A2_AMACRINE_PARAMS = default_a2_amacrine_params(; editable=false),
-        GANGLION_PARAMS = default_gc_params(; editable=false),
-        MULLER_PARAMS = default_muller_params(; editable=false)
+        PHOTORECEPTOR_PARAMS = all_params.PHOTORECEPTOR_PARAMS,
+        HORIZONTAL_PARAMS = all_params.HORIZONTAL_PARAMS,
+        ON_BIPOLAR_PARAMS = all_params.ON_BIPOLAR_PARAMS,
+        OFF_BIPOLAR_PARAMS = all_params.OFF_BIPOLAR_PARAMS,
+        A2_AMACRINE_PARAMS = all_params.A2_AMACRINE_PARAMS,
+        GANGLION_PARAMS = all_params.GANGLION_PARAMS,
+        MULLER_PARAMS = all_params.MULLER_PARAMS
     )
     return editable ? namedtuple_to_dict(params_nt) : params_nt
 end
@@ -215,112 +193,3 @@ function (RCM::RetinalColumnModel)(du, u, p, t)
 
     return nothing
 end
-
-# ── Main model function ─────────────────────────────────────
-
-"""
-    retinal_column_model!(du, u, p, t)
-
-ODE right-hand side for photoreceptor → ON bipolar cell system.
-
-# Arguments
-- `du`: derivative vector (25 elements)
-- `u`: state vector (25 elements)
-- `p`: tuple `(params, stim_params)` where:
-  - `params`: NamedTuple from `default_retinal_params()`
-  - `stim_params`: NamedTuple with stimulus information (stim_start, stim_end, photon_flux, v_hold)
-- `t`: time (ms)
-
-# State vector organization
-```
-u[1:21]   → Photoreceptor states [R, T, P, G, HC1-5, mKv, hKv, mCa, mKCa, Ca_s, Ca_f, CaB_ls, CaB_hs, CaB_lf, CaB_hf, V, Glu]
-u[22:27]  → ON bipolar states [V, n, h, c, S, Glu_release]
-u[28:34]  → OFF bipolar states [V, n, h, c, A, D, Glu_release]
-u[35:41]  → A2 amacrine states [V, n, h, c, A, D, Gly_Release]
-```
-
-# Notes
-- Photoreceptor computes its own glutamate release (u[21])
-- Glutamate is passed directly to ON bipolar cell
-- ON bipolar inverts signal via mGluR6 cascade
-- A2 amacrine cell receives glutamate from ON bipolar cell and releases glycine
-"""
-function retinal_column_model!(du, u, p, t)
-    params, stim_func = p
-    params = params isa AbstractDict ? dict_to_namedtuple(params) : params
-
-    idxs = DEFAULT_INDEXES
-    # === Extract state segments using views (efficient, no copying) ===
-    u_photoreceptor = @view u[idxs.PC_ICS_ID_BEGIN:idxs.PC_ICS_ID_END]
-    u_on_bipolar = @view u[idxs.ONBC_ICS_ID_BEGIN:idxs.ONBC_ICS_ID_END]
-    u_off_bipolar = @view u[idxs.OFFBC_ICS_ID_BEGIN:idxs.OFFBC_ICS_ID_END]
-    u_a2 = @view u[idxs.A2_ICS_ID_BEGIN:idxs.A2_ICS_ID_END]
-    u_gc = @view u[idxs.GC_ICS_ID_BEGIN:idxs.GC_ICS_ID_END]
-    u_muller = @view u[idxs.MULLER_ICS_ID_BEGIN:idxs.MULLER_ICS_ID_END]
-
-    du_photoreceptor = @view du[idxs.PC_ICS_ID_BEGIN:idxs.PC_ICS_ID_END]
-    du_on_bipolar = @view du[idxs.ONBC_ICS_ID_BEGIN:idxs.ONBC_ICS_ID_END]
-    du_off_bipolar = @view du[idxs.OFFBC_ICS_ID_BEGIN:idxs.OFFBC_ICS_ID_END]
-    du_a2 = @view du[idxs.A2_ICS_ID_BEGIN:idxs.A2_ICS_ID_END]
-    du_gc = @view du[idxs.GC_ICS_ID_BEGIN:idxs.GC_ICS_ID_END]
-    du_muller = @view du[idxs.MULLER_ICS_ID_BEGIN:idxs.MULLER_ICS_ID_END]
-    # === Neurotransmitter coupling ===
-
-    # Get glutamate release from photoreceptor state
-    glu_photo_release = u_photoreceptor[idxs.PC_GLU_INDEX]
-
-    # === Call individual cell models ===
-
-    # Photoreceptor
-    photoreceptor_model!(du_photoreceptor, u_photoreceptor, (params.PHOTORECEPTOR_PARAMS, stim_func), t)
-
-    # ON bipolar (receives glutamate from photoreceptor)
-    on_bipolar_model!(
-        du_on_bipolar, u_on_bipolar,
-        (params.ON_BIPOLAR_PARAMS, [glu_photo_release], [1.0]),
-        t
-    )
-    glu_on_bipolar_release = u_on_bipolar[idxs.ONBC_GLU_INDEX]
-
-    # OFF bipolar (receives glutamate from photoreceptor)
-    off_bipolar_model!(
-        du_off_bipolar, u_off_bipolar,
-        (params.OFF_BIPOLAR_PARAMS, [glu_photo_release], [1.0]),
-        t
-    )
-    glu_off_bipolar_release = u_off_bipolar[idxs.OFFBC_GLU_INDEX]
-
-    # A2 amacrine cell (receives glutamate from ON bipolar cell)
-    a2_model!(
-        du_a2, u_a2,
-        (params.A2_AMACRINE_PARAMS, [glu_on_bipolar_release], [1.0]),
-        t
-    )
-    gly_a2_release = u_a2[idxs.A2_GLY_INDEX]
-
-    # Ganglion cell (receives excitatory bipolar and inhibitory A2 amacrine drive)
-    glu_gc_exc = glu_on_bipolar_release + glu_off_bipolar_release
-    ganglion_model!(
-        du_gc, u_gc,
-        (params.GANGLION_PARAMS, [glu_on_bipolar_release, glu_off_bipolar_release], [1.0, 1.0], [gly_a2_release], [1.0]),
-        t
-    )
-
-    #Electrical coupling between cells
-    gap_junction_coupling(du_a2[1], u_a2[1], du_on_bipolar[1], u_on_bipolar[1], params.A2_AMACRINE_PARAMS.C_m, params.ON_BIPOLAR_PARAMS.C_m, params.A2_AMACRINE_PARAMS.g_gap)
-
-    #Model the efflux of K+ from all cells
-    K_photo_efflux = photoreceptor_K_efflux(u_photoreceptor, params.PHOTORECEPTOR_PARAMS)
-    K_onbc_efflux = on_bipolar_K_efflux(u_on_bipolar, params.ON_BIPOLAR_PARAMS)
-    K_offbc_efflux = off_bipolar_K_efflux(u_off_bipolar, params.OFF_BIPOLAR_PARAMS)
-    K_a2_efflux = a2_amacrine_K_efflux(u_a2, params.A2_AMACRINE_PARAMS)
-    K_gc_efflux = ganglion_K_efflux(u_gc, params.GANGLION_PARAMS)
-    # outward-only already returned by helpers
-    I_K_src_stalk = K_photo_efflux + K_onbc_efflux + K_offbc_efflux + K_a2_efflux + K_gc_efflux
-
-    # endfoot is a "sink-adjacent" pool; give it a smaller mixed source
-    I_K_src_end = 0.2 * (K_a2_efflux + K_gc_efflux) + 0.1 * K_onbc_efflux
-    muller_model!(du_muller, u_muller, (params.MULLER_PARAMS, I_K_src_end, I_K_src_stalk, glu_gc_exc), t)
-    return nothing
-end
-

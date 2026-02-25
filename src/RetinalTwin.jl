@@ -11,7 +11,13 @@ include("auxiliary_functions.jl")
 include("current_equations.jl")
 export
     # Parameter loading
+    ParameterSpec,
+    default_param_csv_path,
     load_params_from_csv,
+    load_param_specs_from_csv,
+    load_all_param_specs_from_csv,
+    load_all_param_specs,
+    get_param_spec,
     default_rod_params,
     default_hc_params, default_on_bc_params, default_off_bc_params,
     default_a2_params, default_a2_amacrine_params, default_gaba_params, default_da_params, default_gc_params,

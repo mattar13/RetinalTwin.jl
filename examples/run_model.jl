@@ -10,6 +10,9 @@ using RetinalTwin
 using DifferentialEquations
 using Setfield
 
+# Unified parameter table is now loaded from `src/parameters/retinal_params.csv`.
+all_params = load_all_params()
+
 # ── 1. Build the retinal column ──────────────────────────────
 
 col = build_retinal_column(regime=:scotopic)

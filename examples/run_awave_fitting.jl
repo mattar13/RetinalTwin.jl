@@ -83,7 +83,7 @@ end
 # - OFF bipolar signaling blocked via iGluR conductance.
 # - Müller glia component blocked (BaCl-like) via Kir conductances.
 # -----------------------------------------------------------------------------
-params_dict = default_retinal_params(editable=true)
+params_dict = load_all_params(editable=true)
 
 # ON bipolar block (b-wave component)
 params_dict[:ON_BIPOLAR_PARAMS][:g_TRPM1] = 0.0

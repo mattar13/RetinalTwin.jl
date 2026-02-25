@@ -15,6 +15,7 @@ else
 end
 
 alpha = 1e-3
+params = load_all_params()
 # target = nothing
 target = "ON_BIPOLAR_PARAMS.g_CaL"
 # target = ["ON_BIPOLAR_PARAMS.g_CaL", "ON_BIPOLAR_PARAMS.g_K", (Symbol("A2_AMACRINE_PARAMS"), Symbol("g_gap"))]
@@ -29,6 +30,7 @@ rows = run_gradient_calculation(
     model, u0;
     target = target,
     alpha=alpha,
+    params=params,
     outputs=outputs,
     out_csv=out_csv,
 )

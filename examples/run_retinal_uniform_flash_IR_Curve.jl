@@ -9,7 +9,7 @@ println("RetinalColumnModel Example (Full Build)")
 println("=" ^ 60)
 
 #%% --------- Build/load model ---------
-params = default_retinal_params()
+params = load_all_params()
 map_path = joinpath(@__DIR__, "data", "column_map.json")
 if isfile(map_path)
     model, u0 = load_mapping(map_path)

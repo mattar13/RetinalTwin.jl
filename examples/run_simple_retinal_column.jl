@@ -5,7 +5,7 @@ println("=" ^ 60)
 println("RetinalColumnModel Example (Simple Build)")
 println("=" ^ 60)
 
-params = default_retinal_params()
+params = load_all_params()
 model, u0 = build_column(nPC=1, nONBC=1, nOFFBC=0, nA2=0, nGC=0, nMG=0)
 
 println("Cells: ", ordered_cells(model))
