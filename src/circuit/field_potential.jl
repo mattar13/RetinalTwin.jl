@@ -82,17 +82,18 @@ Post-simulation transretinal field potential by summing every per-channel
 current contribution scaled by channel depth from `erg_depth_map.csv`.
 """
 function compute_field_potential(model::RetinalColumnModel, params::NamedTuple, sol;
-    depth_csv::AbstractString=default_depth_csv_path()
+    depth_csv::AbstractString=default_depth_csv_path(),
+    dt = 0.5
 )
     depth_rows = load_erg_depth_map(depth_csv)
-    t = collect(sol.t)
+    t = sol.t[1]:dt:sol.t[end]
     nt = length(t)
     field_potential = zeros(nt)
 
     ordered = sort!(collect(values(model.cells)), by=cell -> cell.offset)
 
-    for i in 1:nt
-        ui = sol.u[i]
+    for (i, ti) in enumerate(t)
+        ui = sol(ti)
         total = 0.0
 
         for cell in ordered
