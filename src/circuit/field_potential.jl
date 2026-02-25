@@ -76,7 +76,7 @@ end
 end
 
 """
-    compute_field_potential(model, sol; depth_csv=default_depth_csv_path(), params=default_retinal_params())
+    compute_field_potential(model, sol; depth_csv=default_depth_csv_path(), params=load_all_params())
 
 Post-simulation transretinal field potential by summing every per-channel
 current contribution scaled by channel depth from `erg_depth_map.csv`.
@@ -101,7 +101,7 @@ function compute_field_potential(model::RetinalColumnModel, params::NamedTuple, 
             V = uc[cell.outidx.V]
 
             if cell.cell_type == :PC
-                p = params.PHOTORECEPTOR_PARAMS
+                p = params.PHOTO
                 G = uc[PC_IC_MAP.G]
                 HO_sum = uc[PC_IC_MAP.HO1] + uc[PC_IC_MAP.HO2] + uc[PC_IC_MAP.HO3]
                 mKv = uc[PC_IC_MAP.mKv]
@@ -121,7 +121,7 @@ function compute_field_potential(model::RetinalColumnModel, params::NamedTuple, 
                 total += _depth_scale(depth_rows, :PC, :I_ex2) * photoreceptor_I_ex2(Ca_s, p)
 
             elseif cell.cell_type == :HC
-                p = params.HORIZONTAL_PARAMS
+                p = params.HC
                 c = uc[HC_IC_MAP.c]
                 inputs = get(model.connections, cell.name, Tuple{Symbol,Symbol,Float64}[])
                 glu_in = [get_out(ui, model.cells[pre], key) for (pre, key, _) in inputs if key == :Glu]
@@ -136,7 +136,7 @@ function compute_field_potential(model::RetinalColumnModel, params::NamedTuple, 
                 total += _depth_scale(depth_rows, :HC, :I_bk) * horizontal_I_bk(V, c, p)
 
             elseif cell.cell_type == :ONBC
-                p = params.ON_BIPOLAR_PARAMS
+                p = params.ONBC
                 n = uc[ONBC_IC_MAP.n]
                 h = uc[ONBC_IC_MAP.h]
                 c = uc[ONBC_IC_MAP.c]
@@ -151,7 +151,7 @@ function compute_field_potential(model::RetinalColumnModel, params::NamedTuple, 
                 total += _depth_scale(depth_rows, :ONBC, :I_kca) * on_bipolar_I_kca(V, c, p)
 
             elseif cell.cell_type == :OFFBC
-                p = params.OFF_BIPOLAR_PARAMS
+                p = params.OFFBC
                 n = uc[OFFBC_IC_MAP.n]
                 h = uc[OFFBC_IC_MAP.h]
                 c = uc[OFFBC_IC_MAP.c]
@@ -167,7 +167,7 @@ function compute_field_potential(model::RetinalColumnModel, params::NamedTuple, 
                 total += _depth_scale(depth_rows, :OFFBC, :I_kca) * off_bipolar_I_kca(V, c, p)
 
             elseif cell.cell_type == :A2
-                p = params.A2_AMACRINE_PARAMS
+                p = params.A2
                 n = uc[A2_IC_MAP.n]
                 h = uc[A2_IC_MAP.h]
                 c = uc[A2_IC_MAP.c]
@@ -183,7 +183,7 @@ function compute_field_potential(model::RetinalColumnModel, params::NamedTuple, 
                 total += _depth_scale(depth_rows, :A2, :I_kca) * a2_amacrine_I_kca(V, c, p)
 
             elseif cell.cell_type == :GC
-                p = params.GANGLION_PARAMS
+                p = params.GC
                 m = uc[GC_IC_MAP.m]
                 h = uc[GC_IC_MAP.h]
                 n = uc[GC_IC_MAP.n]
@@ -197,7 +197,7 @@ function compute_field_potential(model::RetinalColumnModel, params::NamedTuple, 
                 total += _depth_scale(depth_rows, :GC, :I_inh) * ganglion_I_inh(V, sI, p)
 
             elseif cell.cell_type == :MG
-                p = params.MULLER_PARAMS
+                p = params.MULLER
                 K_o_end = uc[MG_IC_MAP.K_o_end]
                 K_o_stalk = uc[MG_IC_MAP.K_o_stalk]
                 Glu_o = uc[MG_IC_MAP.Glu_o]

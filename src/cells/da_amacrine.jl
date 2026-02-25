@@ -10,7 +10,7 @@
 Return dark-adapted initial conditions for a dopaminergic amacrine cell.
 
 # Arguments
-- `params`: named tuple from `default_da_params()`
+- `params`: named tuple from `load_all_params().DA`
 
 # Returns
 - 3-element state vector [V, w, DA]

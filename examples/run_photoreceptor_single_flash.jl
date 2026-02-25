@@ -11,7 +11,7 @@ using CairoMakie
 # ── 1. Parameters and stimulus ───────────────────────────────
 
 all_params = load_all_params()
-photoreceptor_params = all_params.PHOTORECEPTOR_PARAMS
+photoreceptor_params = all_params.PHOTO
 
 println("Standalone rod photoreceptor")
 println("  Stimulus: $(stim_params.photon_flux) ph/µm²/ms, onset=$(stim_params.stim_start) ms")

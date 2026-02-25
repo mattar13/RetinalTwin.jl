@@ -10,7 +10,7 @@
 Return dark-adapted initial conditions for an RPE cell.
 
 # Arguments
-- `params`: named tuple from `default_rpe_params()`
+- `params`: named tuple from `load_all_params().RPE`
 
 # Returns
 - 2-element state vector [V_RPE, K_sub]
@@ -64,7 +64,7 @@ RPE cell model for c-wave generation.
 - `du`: derivative vector (2 elements)
 - `u`: state vector (2 elements)
 - `p`: tuple `(params, I_K_PR)` where:
-  - `params`: named tuple from `default_rpe_params()`
+  - `params`: named tuple from `load_all_params().RPE`
   - `I_K_PR`: total K+ current from photoreceptors (pA)
 - `t`: time (ms)
 

@@ -1,13 +1,13 @@
 import DifferentialEquations
 
 const PARAM_BLOCK_TO_CELLTYPE = Dict(
-    :PHOTORECEPTOR_PARAMS => :PC,
-    :HORIZONTAL_PARAMS => :HC,
-    :ON_BIPOLAR_PARAMS => :ONBC,
-    :OFF_BIPOLAR_PARAMS => :OFFBC,
-    :A2_AMACRINE_PARAMS => :A2,
-    :GANGLION_PARAMS => :GC,
-    :MULLER_PARAMS => :MG,
+    :PHOTO => :PC,
+    :HC => :HC,
+    :ONBC => :ONBC,
+    :OFFBC => :OFFBC,
+    :A2 => :A2,
+    :GC => :GC,
+    :MULLER => :MG,
 )
 
 function _parse_param_target(target)
@@ -173,7 +173,7 @@ function _fit_ir_outputs(
 end
 
 """
-    calculate_ir_gradient(model, u0, param_target; alpha=1e-3, params=default_retinal_params(), outputs=nothing, fit_kwargs...)
+    calculate_ir_gradient(model, u0, param_target; alpha=1e-3, params=load_all_params(), outputs=nothing, fit_kwargs...)
 
 Compute finite-difference gradients of IR Hill-fit metrics with respect to one parameter
 or a list of parameters.
@@ -206,7 +206,7 @@ function calculate_ir_gradient(
     u0,
     param_target;
     alpha=1e-3,
-    params=default_retinal_params(),
+    params=load_all_params(),
     outputs=nothing,
     fit_kwargs...,
 )
@@ -282,7 +282,7 @@ function _gradient_for_param(
 end
 
 """
-    run_gradient_calculation(model, u0; target=nothing, alpha=1e-3, params=default_retinal_params(), outputs=nothing, out_csv=nothing, fit_kwargs...)
+    run_gradient_calculation(model, u0; target=nothing, alpha=1e-3, params=load_all_params(), outputs=nothing, out_csv=nothing, fit_kwargs...)
 
 Run IR-gradient calculations for selected parameters and optionally save results to CSV.
 
@@ -304,7 +304,7 @@ function run_gradient_calculation(
     u0;
     target=nothing,
     alpha=1e-3,
-    params=default_retinal_params(),
+    params=load_all_params(),
     outputs=nothing,
     out_csv=nothing,
     fit_kwargs...,

@@ -83,19 +83,15 @@ end
 # - OFF bipolar signaling blocked via iGluR conductance.
 # - Müller glia component blocked (BaCl-like) via Kir conductances.
 # -----------------------------------------------------------------------------
-params_dict = load_all_params(editable=true)
-
-# ON bipolar block (b-wave component)
-params_dict[:ON_BIPOLAR_PARAMS][:g_TRPM1] = 0.0
-
-# OFF bipolar block
-params_dict[:OFF_BIPOLAR_PARAMS][:g_iGluR] = 0.0
-
-# Müller glia block (BaCl-like)
-params_dict[:MULLER_PARAMS][:g_Kir_end] = 0.0
-params_dict[:MULLER_PARAMS][:g_Kir_stalk] = 0.0
-
-params = dict_to_namedtuple(params_dict)
+params0 = load_all_params()
+params = merge(
+    params0,
+    (
+        ONBC = merge(params0.ONBC, (g_TRPM1=0.0,)),
+        OFFBC = merge(params0.OFFBC, (g_iGluR=0.0,)),
+        MULLER = merge(params0.MULLER, (g_Kir_end=0.0, g_Kir_stalk=0.0)),
+    ),
+)
 
 pc_coords = square_grid_coords(16)
 model, u0 = build_column(

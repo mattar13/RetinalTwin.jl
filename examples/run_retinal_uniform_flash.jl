@@ -7,7 +7,7 @@ println("RetinalColumnModel Example (Full Build)")
 println("=" ^ 60)
 
 #%% --------- Build/load model ---------
-params = load_all_params(editable=true)
+params0 = load_all_params()
 map_path = joinpath(@__DIR__, "data", "column_map.json")
 if isfile(map_path)
     model, u0 = load_mapping(map_path)
@@ -23,7 +23,7 @@ println("Total states: ", length(u0))
 # Dark adaptation
 tspan_dark = (0.0, 2000.0)
 stim_dark = RetinalTwin.make_uniform_flash_stimulus(photon_flux=0.0)
-sim_params = dict_to_namedtuple(params)
+sim_params = params0
 prob_dark = ODEProblem(model, u0, tspan_dark, (sim_params, stim_dark))
 sol_dark = solve(prob_dark, Rodas5(); save_everystep=false, save_start=false, save_end=true, abstol=1e-6, reltol=1e-4)
 u0 = sol_dark.u[end]
@@ -50,12 +50,11 @@ fig = plot_cell_layout_3d(
 display(fig)
 
 #%% --------- Run the model ---------
-# params[:ON_BIPOLAR_PARAMS][:g_TRPM1] = 0.0 # Disable TRPM1 channel for no b-wave
-# params[:OFF_BIPOLAR_PARAMS][:g_iGluR] = 0.0 # Disable iGluR channel for no d-wave
-params[:MULLER_PARAMS][:g_Kir_end] = 0.0 # Disable Kir channel for no a-wave
-params[:MULLER_PARAMS][:g_Kir_stalk] = 0.0 # Disable Kir channel for no a-wave
+# params = merge(params0, (ONBC = merge(params0.ONBC, (g_TRPM1=0.0,)),)) # Disable TRPM1 channel for no b-wave
+# params = merge(params0, (OFFBC = merge(params0.OFFBC, (g_iGluR=0.0,)),)) # Disable iGluR channel for no d-wave
+params = merge(params0, (MULLER = merge(params0.MULLER, (g_Kir_end=0.0, g_Kir_stalk=0.0)),)) # Disable Kir channel for no a-wave
 
-sim_params = dict_to_namedtuple(params)
+sim_params = params
 
 tspan = (0.0, 1200.0)
 prob = ODEProblem(model, u0, tspan, (sim_params, selected_stimulus))

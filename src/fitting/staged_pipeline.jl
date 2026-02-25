@@ -303,31 +303,31 @@ function default_stages(params::NamedTuple; mode::Symbol=:efficient)
     mult = fine ? 2 : 1
 
     stageA_targets = [
-        make_target(params, :PHOTORECEPTOR_PARAMS, :gCa),
-        make_target(params, :PHOTORECEPTOR_PARAMS, :gKV),
-        make_target(params, :PHOTORECEPTOR_PARAMS, :gH),
-        make_target(params, :PHOTORECEPTOR_PARAMS, :lambda),
-        make_target(params, :PHOTORECEPTOR_PARAMS, :tau_Glu),
+        make_target(params, :PHOTO, :gCa),
+        make_target(params, :PHOTO, :gKV),
+        make_target(params, :PHOTO, :gH),
+        make_target(params, :PHOTO, :lambda),
+        make_target(params, :PHOTO, :tau_Glu),
     ]
     stageB_targets = [
-        make_target(params, :ON_BIPOLAR_PARAMS, :g_TRPM1),
-        make_target(params, :ON_BIPOLAR_PARAMS, :g_Kv),
-        make_target(params, :ON_BIPOLAR_PARAMS, :g_CaL),
-        make_target(params, :ON_BIPOLAR_PARAMS, :tau_S),
-        make_target(params, :ON_BIPOLAR_PARAMS, :K_Glu),
+        make_target(params, :ONBC, :g_TRPM1),
+        make_target(params, :ONBC, :g_Kv),
+        make_target(params, :ONBC, :g_CaL),
+        make_target(params, :ONBC, :tau_S),
+        make_target(params, :ONBC, :K_Glu),
     ]
     stageC_targets = [
-        make_target(params, :A2_AMACRINE_PARAMS, :g_iGluR),
-        make_target(params, :A2_AMACRINE_PARAMS, :g_Kv),
-        make_target(params, :A2_AMACRINE_PARAMS, :g_CaL),
-        make_target(params, :A2_AMACRINE_PARAMS, :tau_A),
-        make_target(params, :A2_AMACRINE_PARAMS, :tau_d),
+        make_target(params, :A2, :g_iGluR),
+        make_target(params, :A2, :g_Kv),
+        make_target(params, :A2, :g_CaL),
+        make_target(params, :A2, :tau_A),
+        make_target(params, :A2, :tau_d),
     ]
     stageD_targets = [
-        make_target(params, :MULLER_PARAMS, :g_Kir_end),
-        make_target(params, :MULLER_PARAMS, :g_Kir_stalk),
-        make_target(params, :MULLER_PARAMS, :alpha_K),
-        make_target(params, :MULLER_PARAMS, :tau_K_diffusion),
+        make_target(params, :MULLER, :g_Kir_end),
+        make_target(params, :MULLER, :g_Kir_stalk),
+        make_target(params, :MULLER, :alpha_K),
+        make_target(params, :MULLER, :tau_K_diffusion),
     ]
     stageA_targets = filter(t -> !_is_param_fixed(t.block, t.name), stageA_targets)
     stageB_targets = filter(t -> !_is_param_fixed(t.block, t.name), stageB_targets)
@@ -401,7 +401,7 @@ function _estimate_uncertainty(
     return DataFrame(rows)
 end
 
-function fit_retinal_twin_staged(model, u0, data::ERGDataSet; params0=default_retinal_params(), mode::Symbol=:efficient, rng=Random.MersenneTwister(4))
+function fit_retinal_twin_staged(model, u0, data::ERGDataSet; params0=load_all_params(), mode::Symbol=:efficient, rng=Random.MersenneTwister(4))
     pdata, fdata = preprocess_erg(data)
     stages = default_stages(params0; mode=mode)
 

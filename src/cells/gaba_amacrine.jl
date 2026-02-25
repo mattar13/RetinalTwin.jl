@@ -8,7 +8,7 @@
 Return dark-adapted initial conditions for a GABAergic amacrine cell.
 
 # Arguments
-- `params`: named tuple from `default_gaba_params()`
+- `params`: named tuple from `load_all_params().GABA`
 
 # Returns
 - 3-element state vector [V, w, GABA]

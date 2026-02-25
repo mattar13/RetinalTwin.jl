@@ -205,7 +205,7 @@ function build_column(;nPC::Int=16, nHC::Int=4, nONBC::Int=4, nOFFBC::Int=0, nA2
         "Increase nONBC or onbc_pool_size."
     )
 
-    params = default_retinal_params()
+    params = load_all_params()
     cells = Dict{Symbol,CellRef}()
     connections = Dict{Symbol,Vector{Tuple{Symbol,Symbol,Float64}}}()
     u0_parts = Vector{Vector{Float64}}()
@@ -215,49 +215,49 @@ function build_column(;nPC::Int=16, nHC::Int=4, nONBC::Int=4, nOFFBC::Int=0, nA2
         x, y = pc_coords === nothing ? (Float64(i), 1.0) : (Float64(pc_coords[i][1]), Float64(pc_coords[i][2]))
         cell = CellRef(:PC, i, offset; x=x, y=y)
         cells[cell.name] = cell
-        push!(u0_parts, photoreceptor_state(params.PHOTORECEPTOR_PARAMS))
+        push!(u0_parts, photoreceptor_state(params.PHOTO))
         offset += cell.nstate
     end
 
     for i in 1:nHC
         cell = CellRef(:HC, i, offset)
         cells[cell.name] = cell
-        push!(u0_parts, horizontal_state(params.HORIZONTAL_PARAMS))
+        push!(u0_parts, horizontal_state(params.HC))
         offset += cell.nstate
     end
 
     for i in 1:nONBC
         cell = CellRef(:ONBC, i, offset)
         cells[cell.name] = cell
-        push!(u0_parts, on_bipolar_state(params.ON_BIPOLAR_PARAMS))
+        push!(u0_parts, on_bipolar_state(params.ONBC))
         offset += cell.nstate
     end
 
     for i in 1:nOFFBC
         cell = CellRef(:OFFBC, i, offset)
         cells[cell.name] = cell
-        push!(u0_parts, off_bipolar_state(params.OFF_BIPOLAR_PARAMS))
+        push!(u0_parts, off_bipolar_state(params.OFFBC))
         offset += cell.nstate
     end
 
     for i in 1:nA2
         cell = CellRef(:A2, i, offset)
         cells[cell.name] = cell
-        push!(u0_parts, a2_amacrine_state(params.A2_AMACRINE_PARAMS))
+        push!(u0_parts, a2_amacrine_state(params.A2))
         offset += cell.nstate
     end
 
     for i in 1:nGC
         cell = CellRef(:GC, i, offset)
         cells[cell.name] = cell
-        push!(u0_parts, ganglion_state(params.GANGLION_PARAMS))
+        push!(u0_parts, ganglion_state(params.GC))
         offset += cell.nstate
     end
 
     for i in 1:nMG
         cell = CellRef(:MG, i, offset)
         cells[cell.name] = cell
-        push!(u0_parts, muller_state(params.MULLER_PARAMS))
+        push!(u0_parts, muller_state(params.MULLER))
         offset += cell.nstate
     end
 

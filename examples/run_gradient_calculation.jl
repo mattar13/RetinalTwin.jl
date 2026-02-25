@@ -17,8 +17,8 @@ end
 alpha = 1e-3
 params = load_all_params()
 # target = nothing
-target = "ON_BIPOLAR_PARAMS.g_CaL"
-# target = ["ON_BIPOLAR_PARAMS.g_CaL", "ON_BIPOLAR_PARAMS.g_K", (Symbol("A2_AMACRINE_PARAMS"), Symbol("g_gap"))]
+target = "ONBC.g_CaL"
+# target = ["ONBC.g_CaL", "ONBC.g_K", (Symbol("A2"), Symbol("g_gap"))]
 # outputs = :ONBC                 # one output type
 outputs = [:ONBC, :A2, :GC]     # multiple output types
 # outputs = [:ONBC1, :ONBC2]      # multiple specific cells
