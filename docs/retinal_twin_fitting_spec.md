@@ -6,6 +6,9 @@
 
 ---
 
+
+> **Implementation note (current repository):** A practical staged fitter based on this specification is implemented in `src/fitting/staged_pipeline.jl`, with usage notes in `docs/staged_fitting_pipeline.md` and a runnable demo in `examples/run_staged_fitting_pipeline.jl`.
+
 ## Table of Contents
 
 1. [Strategy Overview](#1-strategy-overview)
