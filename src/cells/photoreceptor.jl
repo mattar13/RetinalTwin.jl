@@ -99,6 +99,7 @@ function photoreceptor_model!(du, u, p, t)
 
     Phi = stimulus_function(t)
 
+    #Model constants
     E_LEAK = -params.ELEAK
     E_H = -params.eH
     E_K = -params.eK
@@ -133,7 +134,8 @@ function photoreceptor_model!(du, u, p, t)
     dmCa = αmCa(V) * (1 - mCa) - βmCa(V) * mCa
     dmKCa = αmKCa(V) * (1 - mKCa) - βmKCa(V) * mKCa
 
-    Ca_flux = -(iCa + iEX + iEX2) / (2 * params.F * params.V1) * 1e-6
+    F = 96485.332#Faraday constant (C/mol)
+    Ca_flux = -(iCa + iEX + iEX2) / (2 * F * params.V1) * 1e-6
     diffusion_s = params.DCa * (params.S1 / (params.DELTA * params.V1)) * (Ca_s - Ca_f)
     diffusion_f = params.DCa * (params.S1 / (params.DELTA * params.V2)) * (Ca_s - Ca_f)
 

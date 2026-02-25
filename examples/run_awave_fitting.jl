@@ -15,41 +15,48 @@ response_window = (0.5, 1.5)
 # -----------------------------------------------------------------------------
 #%% 1) Open real data and extract trial traces
 # -----------------------------------------------------------------------------
-stimulus_intensity_levels = [
-    (0, 1.0, 4000.0) #nd0 1ms flash
-    (0, 2.0, 4000.0) #nd0 2ms flash
-    (1, 1.0, 400.0) #nd1 1ms flash
-    (1, 2.0, 400.0) #nd1 2ms flash
-    (1, 4.0, 400.0) #nd1 4ms flash
-    (2, 1.0, 40.0) #nd2 1ms flash
-    (2, 2.0, 40.0) #nd2 2ms flash
-    (2, 4.0, 40.0) #nd2 4ms flash
-    (3, 1.0, 4.0) #nd3 1ms flash
-    (3, 2.0, 4.0) #nd3 2ms flash
-    (3, 4.0, 4.0) #nd3 4ms flash 
-    (4, 1.0, 0.4) #nd4 1ms flash photon_flux=0.4
-    (4, 2.0, 0.4) #nd4 2ms flash 
-    (4, 4.0, 0.4) #nd4 4ms flash 
-]
-
-intensity_levels = [flash_duration * photon_flux for (_, flash_duration, photon_flux) in stimulus_intensity_levels]
-sorted_int_idx = sortperm(intensity_levels)
-
-intensity_levels = intensity_levels[sorted_int_idx]
-stimulus_intensity_levels = stimulus_intensity_levels[sorted_int_idx]
+percent_nd0 = Dict(1 => 4000, 3 => 7000)
 
 erg_dir = raw"F:\ERG\Retinoschisis\2019_03_12_AdultWT\Mouse1_Adult_WT\BaCl_LAP4\Rods"
-erg_files = parseABF(erg_dir)[sorted_int_idx]
+erg_files = parseABF(erg_dir)
+real_dataset = openERGData(erg_files, t_post = 6.0)
 
-stim_channel = "IN 7"
-real_dataset = readABF(
-    erg_files;
-    stimulus_name=stim_channel,
-    align_by_stimulus=true,
-    t_pre=0.1,
-    t_post=6.0,
-)
+#%%THIS SECTION GOES AWAY WITH THE NEW UPDATE -------------------------------------------------------------------------
+function parse_stimulus_name(stimulus_name::AbstractString)
+    m = match(r"nd(\d+)_(\d+)p_(\d+)ms.abf", stimulus_name)
+    nd = parse(Int, m.captures[1])
+    percent = parse(Float64, m.captures[2])
+    flash_duration = parse(Float64, m.captures[3])
+    return (nd = nd, percent = percent, flash_duration = flash_duration)
+end
 
+percent_to_photons_eq(percent::Float64; slope = 1881.7, intercept = 1824.9) = slope * percent + intercept
+
+nd_filter(val, nd::Int) = val * 10.0^-nd
+
+function calculate_photons(stimulus_name::AbstractString)
+    params = parse_stimulus_name(stimulus_name)
+    nd = params.nd
+    flash_duration = params.flash_duration
+    photons = nd_filter(percent_to_photons_eq(params.percent), nd) * flash_duration
+    return photons
+end
+#THIS SECTION GOES AWAY WITH THE NEW UPDATE -------------------------------------------------------------------------
+
+stimulus_intensity_levels = map(parse_stimulus_name, real_dataset.HeaderDict["abfPath"])
+intensity_levels = map(calculate_photons, real_dataset.HeaderDict["abfPath"])
+sorted_idx = sortperm(intensity_levels)
+
+intensity_levels = intensity_levels[sorted_idx]
+stimulus_intensity_levels = stimulus_intensity_levels[sorted_idx]
+
+#Stimuli for model
+stimulus_model = map(x -> (duration = x.flash_duration, intensity = nd_filter(percent_to_photons_eq(x.percent), x.nd)), stimulus_intensity_levels)
+stimulus_model
+real_dataset.data_array = real_dataset.data_array[sorted_idx, :, :]
+
+
+#%%
 n_sweeps = eachtrial(real_dataset) |> length
 real_traces = Vector{Vector{Float64}}(undef, n_sweeps)
 real_t = Vector{Vector{Float64}}(undef, n_sweeps)
@@ -137,18 +144,20 @@ tspan = (0.0, 6.0)
 dt = 0.01
 t_rng = tspan[1]:dt:tspan[2]
 
-for (i, (nd, flash_duration, photon_flux)) in enumerate(stimulus_intensity_levels)
+for (i, stim_model) in enumerate(stimulus_model)
+    # println(stim_model)
+    # println("Stimulus $(i): duration=$(stim_model.duration)ms, intensity=$(stim_model.intensity) photons")
     stim = RetinalTwin.make_uniform_flash_stimulus(
         stim_start=stim_start,
-        stim_end=stim_start + flash_duration/1000.0,
-        photon_flux=photon_flux,
+        stim_end=stim_start + stim_model.duration/1000.0,
+        photon_flux=stim_model.intensity,
     )
 
     prob = ODEProblem(model, u0_dark, tspan, (params, stim))
     sol = solve(
         prob,
         Rodas5();
-        tstops=[stim_start, stim_start + flash_duration/1000.0],
+        tstops=[stim_start, stim_start + stim_model.duration/1000.0],
         abstol=1e-6,
         reltol=1e-4,
     )
@@ -161,7 +170,7 @@ for (i, (nd, flash_duration, photon_flux)) in enumerate(stimulus_intensity_level
     peak_amp[i] = -minimum(erg[response_idx])
 
     println(
-        "Intensity $(photon_flux) $(flash_duration)ms: retcode=$(sol.retcode), " *
+        "Intensity $(stim_model.intensity) $(stim_model.duration)ms: retcode=$(sol.retcode), " *
         "a-wave amp=$(round(peak_amp[i], digits=4))"
     )
 end
@@ -171,7 +180,10 @@ end
 #%% 6) Plot simulated column (left) and real-data column (right)
 # -----------------------------------------------------------------------------
 fig = Figure(size=(1600, 820))
-palette = cgrad(:viridis, length(intensity_levels), categorical=true)
+log_intensity_levels = log10.(intensity_levels)
+logI_min, logI_max = extrema(log_intensity_levels)
+trace_cmap = cgrad(:viridis)
+trace_colors = get.(Ref(trace_cmap), (log_intensity_levels .- logI_min) ./ (logI_max - logI_min + eps()))
 
 # Simulated traces (top-left) --------------------------------------------------
 ax_sim_trace = Axis(
@@ -181,10 +193,10 @@ ax_sim_trace = Axis(
     title="Simulated BaCl + LAP4 ERG",
 )
 for (i, I) in enumerate(intensity_levels)
-    lines!(ax_sim_trace, t_rng, erg_traces[i], color=palette[i], linewidth=2.0, label="I=$(I)")
+    lines!(ax_sim_trace, t_rng, erg_traces[i], color=trace_colors[i], linewidth=2.0, label="I=$(I)")
     vspan!(ax_sim_trace, stim_start, stim_start + stimulus_intensity_levels[i][2]/1000.0, color=(:gold, 0.15))
 end
-axislegend(ax_sim_trace, position=:rb)
+# axislegend(ax_sim_trace, position=:rb)
 
 # Simulated IR + Hill fit (bottom-left) -----------------------------------------
 ax_sim_ir = Axis(
@@ -217,10 +229,17 @@ ax_real_trace = Axis(
     title="Real BaCl + LAP4 ERG",
 )
 for i in 1:n_sweeps
-    lines!(ax_real_trace, real_t[i], real_traces[i], color=palette[i], linewidth=2.0, label="") 
+    lines!(ax_real_trace, real_t[i], real_traces[i], color=trace_colors[i], linewidth=2.0, label="")
     vspan!(ax_real_trace, stim_start, stim_start + stimulus_intensity_levels[i][2]/1000.0, color=(:gold, 0.15))
 end
-axislegend(ax_real_trace, position=:rb)
+# axislegend(ax_real_trace, position=:rb)
+
+Colorbar(
+    fig[1, 3],
+    colormap=:viridis,
+    limits=(logI_min, logI_max),
+    label="log10 photons",
+)
 
 # Real IR + Hill fit (bottom-right)
 ax_real_ir = Axis(
