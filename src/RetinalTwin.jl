@@ -79,10 +79,12 @@ export make_uniform_flash_stimulus, exponential_spot_stimulus, make_exponential_
 include("fitting/fitting.jl")
 include("fitting/gradients.jl")
 include("fitting/staged_pipeline.jl")
+include("fitting/optim_fitting.jl")
 export hill_ir, fit_hill_ir, calculate_ir_gradient, run_gradient_calculation
 export ERGDataSet, ERGFeatures, ParameterTarget, StageDefinition, StageResult, StagedFitResult
 export load_erg_data, preprocess_erg, extract_erg_features, make_target, default_stages
 export fit_retinal_twin_staged, save_fit_datasheet, plot_fit_diagnostics, simulate_erg_dataset
+export fittable_params, fit_erg, simulate_erg
 
 # # --- ERG ---
 include("circuit/field_potential.jl")

@@ -21,28 +21,6 @@ erg_dir = raw"F:\ERG\Retinoschisis\2019_03_12_AdultWT\Mouse1_Adult_WT\BaCl_LAP4\
 erg_files = parseABF(erg_dir)
 real_dataset = openERGData(erg_files, t_post = 6.0)
 
-#%%THIS SECTION GOES AWAY WITH THE NEW UPDATE -------------------------------------------------------------------------
-function parse_stimulus_name(stimulus_name::AbstractString)
-    m = match(r"nd(\d+)_(\d+)p_(\d+)ms.abf", stimulus_name)
-    nd = parse(Int, m.captures[1])
-    percent = parse(Float64, m.captures[2])
-    flash_duration = parse(Float64, m.captures[3])
-    return (nd = nd, percent = percent, flash_duration = flash_duration)
-end
-
-percent_to_photons_eq(percent::Float64; slope = 1881.7, intercept = 1824.9) = slope * percent + intercept
-
-nd_filter(val, nd::Int) = val * 10.0^-nd
-
-function calculate_photons(stimulus_name::AbstractString)
-    params = parse_stimulus_name(stimulus_name)
-    nd = params.nd
-    flash_duration = params.flash_duration
-    photons = nd_filter(percent_to_photons_eq(params.percent), nd) * flash_duration
-    return photons
-end
-#THIS SECTION GOES AWAY WITH THE NEW UPDATE -------------------------------------------------------------------------
-
 stimulus_intensity_levels = map(parse_stimulus_name, real_dataset.HeaderDict["abfPath"])
 intensity_levels = map(calculate_photons, real_dataset.HeaderDict["abfPath"])
 sorted_idx = sortperm(intensity_levels)
