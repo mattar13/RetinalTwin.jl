@@ -32,7 +32,8 @@ _normalize_cell_type(s::Symbol) = get(_CELL_TYPE_ALIASES, Symbol(uppercase(Strin
 
 function _parse_float_or(x, fallback::Float64)
     x === missing && return fallback
-    s = strip(String(x))
+    x isa Number && return Float64(x)
+    s = strip(string(x))
     isempty(s) && return fallback
     y = tryparse(Float64, s)
     return y === nothing ? fallback : y
@@ -40,7 +41,8 @@ end
 
 function _parse_bool(x, fallback::Bool=false)
     x === missing && return fallback
-    s = lowercase(strip(String(x)))
+    x isa Bool && return x
+    s = lowercase(strip(string(x)))
     isempty(s) && return fallback
     s in ("true", "t", "1", "yes", "y") && return true
     s in ("false", "f", "0", "no", "n") && return false
@@ -67,7 +69,10 @@ function _all_specs_from_dataframe(df::DataFrame; editable::Bool=false)
     has_cell_type = :CellType in propertynames(df)
 
     for row in eachrow(df)
-        key = Symbol(strip(String(getproperty(row, :Key))))
+        key_raw = getproperty(row, :Key)
+        key_s = strip(string(key_raw))
+        isempty(key_s) && continue
+        key = Symbol(key_s)
         value = _parse_float_or(getproperty(row, :Value), NaN)
         isnan(value) && continue
 
@@ -81,9 +86,9 @@ function _all_specs_from_dataframe(df::DataFrame; editable::Bool=false)
         lo = min(lower, upper)
         hi = max(lower, upper)
         fixed = :Fixed in propertynames(df) ? _parse_bool(getproperty(row, :Fixed), false) : false
-        desc = :Description in propertynames(df) ? strip(String(getproperty(row, :Description))) : ""
+        desc = :Description in propertynames(df) ? strip(string(getproperty(row, :Description))) : ""
 
-        cell_type = has_cell_type ? _normalize_cell_type(Symbol(uppercase(strip(String(getproperty(row, :CellType)))))) : :PARAMS
+        cell_type = has_cell_type ? _normalize_cell_type(Symbol(uppercase(strip(string(getproperty(row, :CellType)))))) : :PARAMS
         if !(cell_type in cell_order)
             push!(cell_order, cell_type)
             grouped_names[cell_type] = Symbol[]
