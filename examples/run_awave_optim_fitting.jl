@@ -82,7 +82,7 @@ model, u0 = build_column(
 println("\nCells in model: ", ordered_cells(model))
 println("Total states: ", length(u0))
 
-# ─── 5) Run fitting ──────────────────────────────────────────────────────────
+#%% 4) Run fitting experiment 
 
 println("\n" * "=" ^ 70)
 println("Starting a-wave parameter fitting...")

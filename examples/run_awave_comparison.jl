@@ -15,7 +15,7 @@ response_window = (0.5, 1.5)
 
 erg_dir = raw"F:\ERG\Retinoschisis\2019_03_12_AdultWT\Mouse1_Adult_WT\BaCl_LAP4\Rods"
 erg_files = parseABF(erg_dir)
-real_dataset = openERGData(erg_files, t_post = 6.0)
+real_dataset = openERGData(erg_files,t_post = 6.0)
 
 #Extract traces from ElectroPhysiology types into plain vectors ────────
 n_sweeps = eachtrial(real_dataset) |> length
@@ -85,22 +85,7 @@ model, u0 = build_column(
 println("Cells in model: ", ordered_cells(model))
 println("Total states: ", length(u0))
 
-# -----------------------------------------------------------------------------
-# 3) Dark adapt initial condition
-# -----------------------------------------------------------------------------
-tspan_dark = (0.0, 2000.0)
-stim_dark = RetinalTwin.make_uniform_flash_stimulus(photon_flux=0.0)
-prob_dark = ODEProblem(model, u0, tspan_dark, (params, stim_dark))
-sol_dark = solve(
-    prob_dark,
-    Rodas5();
-    save_everystep=false,
-    save_start=false,
-    save_end=true,
-    abstol=1e-6,
-    reltol=1e-4,
-)
-u0_dark = sol_dark.u[end]
+u0 = dark_adapt(model, u0, params; time = 2000.0, abstol=1e-6, reltol=1e-4)
 
 #%% 4) IR protocol and ERG extraction for each flash intensity
 
@@ -115,36 +100,10 @@ tspan = (0.0, 6.0)
 dt = 0.01
 t_rng = tspan[1]:dt:tspan[2]
 
-for (i, stim_model) in enumerate(stimulus_model)
-    # println(stim_model)
-    # println("Stimulus $(i): duration=$(stim_model.duration)ms, intensity=$(stim_model.intensity) photons")
-    stim = RetinalTwin.make_uniform_flash_stimulus(
-        stim_start=stim_start,
-        stim_end=stim_start + stim_model.duration/1000.0,
-        photon_flux=stim_model.intensity,
-    )
+stimulus_model
+t, erg_traces, solutions, peak_amp = simulate_erg(model, u0, params, stimulus_model; tspan=tspan, dt=dt);
 
-    prob = ODEProblem(model, u0_dark, tspan, (params, stim))
-    sol = solve(
-        prob,
-        Rodas5();
-        tstops=[stim_start, stim_start + stim_model.duration/1000.0],
-        abstol=1e-6,
-        reltol=1e-4,
-    )
-
-    t_erg, erg = compute_field_potential(model, params, sol; dt = dt)
-    solutions[i] = sol
-    erg_traces[i] = erg
-
-    response_idx = findall(t -> response_window[1] <= t <= response_window[2], t_rng)
-    peak_amp[i] = -minimum(erg[response_idx])
-
-    println(
-        "Intensity $(stim_model.intensity) $(stim_model.duration)ms: retcode=$(sol.retcode), " *
-        "a-wave amp=$(round(peak_amp[i], digits=4))"
-    )
-end
+erg_traces
 
 size(t_rng)
 size(real_t[1])
@@ -257,7 +216,6 @@ ax_trace_resid = Axis(
     title="Trace residuals in fit window (|real - sim|)",
 )
 
-
 for i in 1:n_sweeps
     band!(
         ax_trace_resid,
@@ -284,18 +242,3 @@ scatter!(ax_ir_resid, intensity_levels, ir_residual, color=:red, markersize=8)
 #save the figure
 save(joinpath(@__DIR__, "plots", "awave_ir_sim_vs_real.png"), fig)
 display(fig)
-
-# -----------------------------------------------------------------------------
-#%% 7) Optional IR summary table (sim + real)
-# -----------------------------------------------------------------------------
-out_csv = joinpath(@__DIR__, "data", "awave_ir_simulation.csv")
-open(out_csv, "w") do io
-    println(io, "dataset,intensity,awave_peak_min_erg,awave_amplitude")
-    for (I, peak_min, amp) in zip(intensity_levels, peak_amp)
-        println(io, "simulated,$(I),$(peak_min),$(amp)")
-    end
-    for (I, peak_min, amp) in zip(real_intensity_levels, real_awave_amp)
-        println(io, "real,$(I),$(peak_min),$(amp)")
-    end
-end
-println("Saved IR summary CSV: ", out_csv)
