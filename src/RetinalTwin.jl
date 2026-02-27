@@ -7,8 +7,8 @@ using Statistics
 # --- Core types ---
 # --- Default parameters ---
 include("parameters/parameter_extraction.jl")
-include("auxiliary_functions.jl")
-include("current_equations.jl")
+include("cells/auxiliary_functions.jl")
+include("circuit/current_equations.jl")
 export
     # Parameter loading
     ParameterSpec,
@@ -58,7 +58,7 @@ export
     retinal_column_model!
 
 # --- Solution extraction helpers ---
-include("solution_extraction_utils.jl")
+include("utils/solution_extraction_utils.jl")
 export
     ordered_cells,
     ordered_cells_by_offset,
@@ -68,6 +68,10 @@ export
     release_spec,
     state_trace,
     finite_mean
+
+# --- Convienance functions ---
+include("utils/convienance_functions.jl")
+export dark_adapt
 
 # --- Stimulus protocols ---
 include("stimulus_protocols/single_flash.jl")

@@ -88,21 +88,7 @@ end
 
 # ── Simulation ───────────────────────────────────────────────
 
-"""
-    _dark_adapt(model, u0, params; tspan_dark=(0.0, 2000.0), abstol=1e-6, reltol=1e-4)
 
-Run the model with zero stimulus to reach dark-adapted steady state.
-"""
-function _optim_dark_adapt(model, u0, params; tspan_dark=(0.0, 2000.0), abstol=1e-6, reltol=1e-4)
-    stim_dark = make_uniform_flash_stimulus(photon_flux=0.0)
-    prob = DifferentialEquations.ODEProblem(model, u0, tspan_dark, (params, stim_dark))
-    sol = DifferentialEquations.solve(
-        prob, DifferentialEquations.Rodas5();
-        save_everystep=false, save_start=false, save_end=true,
-        abstol=abstol, reltol=reltol,
-    )
-    return sol.u[end]
-end
 
 """
     simulate_erg(model, u0_dark, params, stimuli; tspan=(0.0, 6.0), dt=0.01)
@@ -145,11 +131,75 @@ end
 # ── Loss function ────────────────────────────────────────────
 
 """
+    residual_traces(t_sim, sim_traces, real_t, real_traces; absolute=false)
+
+Compute pointwise residual traces (`real - sim`) across all intensities using
+the same time-alignment strategy as fitting (`searchsortedlast` on `t_sim`).
+
+Set `absolute=true` to return `abs(real - sim)` at each sample.
+Returns an empty vector when inputs are invalid.
+"""
+function residual_traces(
+    t_sim::AbstractVector{<:Real},
+    sim_traces::Vector{<:AbstractVector},
+    real_t::Vector{<:AbstractVector},
+    real_traces::Vector{<:AbstractVector};
+    absolute::Bool=false,
+)
+    length(sim_traces) == length(real_t) == length(real_traces) || return Vector{Vector{Float64}}()
+    isempty(t_sim) && return Vector{Vector{Float64}}()
+
+    out = Vector{Vector{Float64}}(undef, length(sim_traces))
+    for i in eachindex(sim_traces)
+        st = sim_traces[i]
+        rt = real_t[i]
+        ry = real_traces[i]
+
+        isempty(st) && return Vector{Vector{Float64}}()
+        any(isnan, st) && return Vector{Vector{Float64}}()
+        length(rt) == length(ry) || return Vector{Vector{Float64}}()
+
+        resid = Vector{Float64}(undef, length(rt))
+        for j in eachindex(rt)
+            k = clamp(searchsortedlast(t_sim, rt[j]), 1, length(t_sim))
+            d = ry[j] - st[k]
+            resid[j] = absolute ? abs(d) : d
+        end
+        out[i] = resid
+    end
+    return out
+end
+
+"""
+    mean_squared_error(t_sim, sim_traces, real_t, real_traces)
+
+Compute full-waveform mean squared error between real and simulated ERG traces
+across all intensities.
+
+For each real sample time point, the simulated value is sampled using
+`searchsortedlast` on `t_sim`, matching the existing fitting alignment logic.
+Returns `Inf` when traces are invalid, simulation failed, or no samples exist.
+"""
+function mean_squared_error(
+    t_sim::AbstractVector{<:Real},
+    sim_traces::Vector{<:AbstractVector},
+    real_t::Vector{<:AbstractVector},
+    real_traces::Vector{<:AbstractVector},
+)
+    residuals = residual_traces(t_sim, sim_traces, real_t, real_traces)
+    isempty(residuals) && return Inf
+    n_total = sum(length, residuals)
+    n_total > 0 || return Inf
+    total_loss = sum(sum(abs2, r) for r in residuals)
+    return total_loss / n_total
+end
+
+"""
     erg_loss(theta, model, u0, base_params, fit_list, stimuli, real_t, real_traces;
              time_window, tspan, dt)
 
-Compute mean squared error between simulated and real ERG traces within
-the specified time window across all intensities.
+Compute full-waveform mean squared error between simulated and real ERG traces
+across all intensities.
 
 Returns `Inf` if simulation fails for any intensity.
 """
@@ -171,29 +221,7 @@ function erg_loss(
     end
 
     t_sim, sim_traces = simulate_erg(model, u0_dark, params, stimuli; tspan=tspan, dt=dt)
-
-    total_loss = 0.0
-    n_total = 0
-
-    for i in eachindex(stimuli)
-        # Check for simulation failure
-        any(isnan, sim_traces[i]) && return Inf
-
-        rt = real_t[i]
-        ry = real_traces[i]
-
-        for j in eachindex(rt)
-            t = rt[j]
-            time_window[1] <= t <= time_window[2] || continue
-
-            # Interpolate simulated trace at this time point
-            k = clamp(searchsortedlast(t_sim, t), 1, length(t_sim))
-            total_loss += (ry[j] - sim_traces[i][k])^2
-            n_total += 1
-        end
-    end
-
-    return n_total > 0 ? total_loss / n_total : Inf
+    return mean_squared_error(t_sim, sim_traces, real_t, real_traces)
 end
 
 # ── Main fitting function ────────────────────────────────────
@@ -209,7 +237,7 @@ Fit ERG model parameters to real data using staged optimization.
 - `stimuli`: Vector of `(intensity=Float64, duration_sec=Float64)` per intensity
 - `real_t`: Vector of time vectors (one per intensity), from ElectroPhysiology.jl
 - `real_traces`: Vector of trace vectors (one per intensity)
-- `time_window`: `(t_start, t_end)` in seconds for the fit region
+- `time_window`: retained for backward compatibility; currently ignored
 - `nm_iterations`: NelderMead iterations (default 500)
 - `lbfgs_iterations`: LBFGS iterations (default 100)
 - `run_lbfgs`: whether to run LBFGS refinement phase (default true)
@@ -244,7 +272,7 @@ function fit_erg(
 
     if verbose
         println("Fitting $(n_params) parameters from cell types: $(cell_types)")
-        println("Time window: $(time_window), $(length(stimuli)) intensities")
+        println("Loss: full-waveform MSE, $(length(stimuli)) intensities")
         for (i, (ct, key, spec)) in enumerate(fit_list)
             println("  [$i] $(ct).$(key) = $(spec.value) ∈ [$(spec.lower), $(spec.upper)]")
         end
