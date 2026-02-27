@@ -4,37 +4,20 @@ using DifferentialEquations
 using CairoMakie
 using Statistics
 using ElectroPhysiology
+import ElectroPhysiology: parse_stimulus_name, calculate_photons, percent_to_photons_eq, nd_filter
 
 println("=" ^ 70)
 println("A-wave simulation workflow (photoreceptor-dominant BaCl + LAP4)")
 println("=" ^ 70)
 
-##%% Set up some overall parameters
+#%% 1) Load real BaCl+LAP4 ERG data via ElectroPhysiology.jl ────────────────
 response_window = (0.5, 1.5)
-
-# -----------------------------------------------------------------------------
-#%% 1) Open real data and extract trial traces
-# -----------------------------------------------------------------------------
-percent_nd0 = Dict(1 => 4000, 3 => 7000)
 
 erg_dir = raw"F:\ERG\Retinoschisis\2019_03_12_AdultWT\Mouse1_Adult_WT\BaCl_LAP4\Rods"
 erg_files = parseABF(erg_dir)
 real_dataset = openERGData(erg_files, t_post = 6.0)
 
-stimulus_intensity_levels = map(parse_stimulus_name, real_dataset.HeaderDict["abfPath"])
-intensity_levels = map(calculate_photons, real_dataset.HeaderDict["abfPath"])
-sorted_idx = sortperm(intensity_levels)
-
-intensity_levels = intensity_levels[sorted_idx]
-stimulus_intensity_levels = stimulus_intensity_levels[sorted_idx]
-
-#Stimuli for model
-stimulus_model = map(x -> (duration = x.flash_duration, intensity = nd_filter(percent_to_photons_eq(x.percent), x.nd)), stimulus_intensity_levels)
-stimulus_model
-real_dataset.data_array = real_dataset.data_array[sorted_idx, :, :]
-
-
-#%%
+#Extract traces from ElectroPhysiology types into plain vectors ────────
 n_sweeps = eachtrial(real_dataset) |> length
 real_traces = Vector{Vector{Float64}}(undef, n_sweeps)
 real_t = Vector{Vector{Float64}}(undef, n_sweeps)
@@ -52,8 +35,24 @@ for (i, sweep) in enumerate(eachtrial(real_dataset))
     real_amp[i] = -minimum(y[first_peak_idx:last_peak_idx])
 end
 
+dt = real_t[1][2] - real_t[1][1]
+
+#%% 2) Parse stimulus info (this section goes away with ElectroPhysiology update)
+
+stimulus_intensity_levels = map(parse_stimulus_name, real_dataset.HeaderDict["abfPath"])
+intensity_levels = map(calculate_photons, real_dataset.HeaderDict["abfPath"])
+sorted_idx = sortperm(intensity_levels)
+
+intensity_levels = intensity_levels[sorted_idx]
+stimulus_intensity_levels = stimulus_intensity_levels[sorted_idx]
+
+#Stimuli for model
+stimulus_model = map(x -> (duration = x.flash_duration, intensity = nd_filter(percent_to_photons_eq(x.percent), x.nd)), stimulus_intensity_levels)
+real_dataset.data_array = real_dataset.data_array[sorted_idx, :, :]
+
+
 # -----------------------------------------------------------------------------
-#%% 2) Build model + parameter set for BaCl+LAP4-like blocked components
+#%% 3) Build model + parameter set for BaCl+LAP4-like blocked components
 #
 # Goal: photoreceptor-dominant response (a-wave focused), while preserving the
 # full ERG depth map and cell architecture.
@@ -61,15 +60,14 @@ end
 # - OFF bipolar signaling blocked via iGluR conductance.
 # - Müller glia component blocked (BaCl-like) via Kir conductances.
 # -----------------------------------------------------------------------------
-params0 = load_all_params()
-params = merge(
-    params0,
-    (
-        ONBC = merge(params0.ONBC, (g_TRPM1=0.0,)),
-        OFFBC = merge(params0.OFFBC, (g_iGluR=0.0,)),
-        MULLER = merge(params0.MULLER, (g_Kir_end=0.0, g_Kir_stalk=0.0)),
-    ),
-)
+params_dict = load_all_params(editable = true)
+
+params_dict[:ONBC][:g_TRPM1] = 0.0
+params_dict[:OFFBC][:g_iGluR] = 0.0
+params_dict[:MULLER][:g_Kir_end] = 0.0
+params_dict[:MULLER][:g_Kir_stalk] = 0.0
+
+params = dict_to_namedtuple(params_dict)
 
 pc_coords = square_grid_coords(16)
 model, u0 = build_column(
@@ -104,9 +102,8 @@ sol_dark = solve(
 )
 u0_dark = sol_dark.u[end]
 
-# -----------------------------------------------------------------------------
-# 4) IR protocol and ERG extraction for each flash intensity
-# -----------------------------------------------------------------------------
+#%% 4) IR protocol and ERG extraction for each flash intensity
+
 stim_start = 0.0
 
 # save outputs
@@ -149,17 +146,32 @@ for (i, stim_model) in enumerate(stimulus_model)
     )
 end
 
-#We want to sort the peak_awave
-# -----------------------------------------------------------------------------
+size(t_rng)
+size(real_t[1])
+
+#%% Calculate the residual
+
+# Full-waveform MSE and residuals aligned to the exact MSE indexing strategy.
+trace_mse = RetinalTwin.mean_squared_error(t_rng, erg_traces, real_t, real_traces)
+println("Trace MSE (full waveform): ", trace_mse)
+
+trace_residual_abs = RetinalTwin.residual_traces(
+    t_rng, erg_traces, real_t, real_traces; absolute=true
+)
+isempty(trace_residual_abs) && error("Could not compute residual traces: invalid trace/time inputs.")
+
+ir_residual = real_amp .- peak_amp
+
+
 #%% 6) Plot simulated column (left) and real-data column (right)
-# -----------------------------------------------------------------------------
-fig = Figure(size=(1600, 820))
+fig = Figure(size=(1200, 800))
 log_intensity_levels = log10.(intensity_levels)
 logI_min, logI_max = extrema(log_intensity_levels)
 trace_cmap = cgrad(:viridis)
 trace_colors = get.(Ref(trace_cmap), (log_intensity_levels .- logI_min) ./ (logI_max - logI_min + eps()))
+resid_cmap = cgrad(:Reds)
+resid_colors = get.(Ref(resid_cmap), 0.35 .+ 0.60 .* ((log_intensity_levels .- logI_min) ./ (logI_max - logI_min + eps())))
 
-# Simulated traces (top-left) --------------------------------------------------
 ax_sim_trace = Axis(
     fig[1, 1],
     xlabel="Time (ms)",
@@ -174,7 +186,7 @@ end
 
 # Simulated IR + Hill fit (bottom-left) -----------------------------------------
 ax_sim_ir = Axis(
-    fig[2, 1],
+    fig[1, 2],
     xlabel="Flash intensity (photon flux)",
     ylabel="A-wave amplitude (-minimum ERG)",
     xscale=log10,
@@ -197,7 +209,7 @@ axislegend(ax_sim_ir, position=:rb)
 
 # Real traces (top-right) -------------------------------------------------------
 ax_real_trace = Axis(
-    fig[1, 2],
+    fig[2, 1],
     xlabel="Time (ms)",
     ylabel="ERG (a.u.)",
     title="Real BaCl + LAP4 ERG",
@@ -237,6 +249,37 @@ if real_fit.ok
 end
 axislegend(ax_real_ir, position=:rb)
 
+# Residual traces (third-row left) --------------------------------------------
+ax_trace_resid = Axis(
+    fig[3, 1],
+    xlabel="Time (ms)",
+    ylabel="|Residual|",
+    title="Trace residuals in fit window (|real - sim|)",
+)
+
+
+for i in 1:n_sweeps
+    band!(
+        ax_trace_resid,
+        real_t[i],
+        zeros(length(real_t[i])),
+        trace_residual_abs[i],
+        color=(resid_colors[i], 0.50),
+    )
+end 
+# hline!(ax_trace_resid, [0.0], color=(:black, 0.4), linewidth=1.0)
+
+# IR residuals (third-row right) -----------------------------------------------
+ax_ir_resid = Axis(
+    fig[3, 2],
+    xlabel="Flash intensity (photon flux)",
+    ylabel="Residual (real - sim)",
+    xscale=log10,
+    title="IR residuals",
+)
+lines!(ax_ir_resid, intensity_levels, ir_residual, color=:red, linewidth=2.5)
+scatter!(ax_ir_resid, intensity_levels, ir_residual, color=:red, markersize=8)
+# hline!(ax_ir_resid, [0.0], color=(:black, 0.4), linewidth=1.0, linestyle=:dash)
 
 #save the figure
 save(joinpath(@__DIR__, "plots", "awave_ir_sim_vs_real.png"), fig)
