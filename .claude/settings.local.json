@@ -17,7 +17,10 @@
       "Bash(wc:*)",
       "Bash(find:*)",
       "Bash(for file in *.csv)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(ls -la /c/Users/mtarc/Julia/dev/RetinalTwin.jl/src/*/)",
+      "Bash(grep -n \"struct\\\\|mutable\" /c/Users/mtarc/Julia/dev/RetinalTwin.jl/src/utils/*.jl)",
+      "Bash(grep -n \"build_column\\\\|square_grid\" /c/Users/mtarc/Julia/dev/RetinalTwin.jl/examples/*.jl)"
     ]
   }
 }
