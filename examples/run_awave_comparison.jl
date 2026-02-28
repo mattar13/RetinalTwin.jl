@@ -69,18 +69,7 @@ params_dict[:MULLER][:g_Kir_stalk] = 0.0
 
 params = dict_to_namedtuple(params_dict)
 
-pc_coords = square_grid_coords(16)
-model, u0 = build_column(
-    nPC=16,
-    nHC=4,
-    nONBC=4,
-    onbc_pool_size=4,
-    nOFFBC=4,
-    nA2=4,
-    nGC=1,
-    nMG=4,
-    pc_coords=pc_coords,
-)
+model, u0 = default_build_column()
 
 println("Cells in model: ", ordered_cells(model))
 println("Total states: ", length(u0))

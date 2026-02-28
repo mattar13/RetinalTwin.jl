@@ -86,48 +86,6 @@ function unpack_params(theta::AbstractVector{<:Real}, base_params::NamedTuple, f
     return p
 end
 
-# ── Simulation ───────────────────────────────────────────────
-
-
-
-"""
-    simulate_erg(model, u0_dark, params, stimuli; tspan=(0.0, 6.0), dt=0.01)
-
-Simulate ERG traces for multiple stimulus intensities.
-
-# Arguments
-- `stimuli`: Vector of NamedTuples with fields `intensity` and `duration_sec`
-- Returns `(t_grid, traces)` where traces is a Vector{Vector{Float64}}
-
-Failed ODE solves produce NaN-filled traces rather than throwing.
-"""
-function simulate_erg(model, u0_dark, params, stimuli; tspan=(0.0, 6.0), dt=0.01)
-    t_grid = collect(range(tspan[1], tspan[2]; step=dt))
-    traces = Vector{Vector{Float64}}(undef, length(stimuli))
-
-    for (i, s) in enumerate(stimuli)
-        try
-            stim = make_uniform_flash_stimulus(
-                stim_start=0.0,
-                stim_end=s.duration_sec,
-                photon_flux=s.intensity,
-            )
-            prob = DifferentialEquations.ODEProblem(model, u0_dark, tspan, (params, stim))
-            sol = DifferentialEquations.solve(
-                prob, DifferentialEquations.Rodas5();
-                tstops=[0.0, s.duration_sec],
-                abstol=1e-6, reltol=1e-4,
-            )
-            t_erg, erg = compute_field_potential(model, params, sol; dt=dt)
-            traces[i] = erg
-        catch
-            traces[i] = fill(NaN, length(t_grid))
-        end
-    end
-
-    return t_grid, traces
-end
-
 # ── Loss function ────────────────────────────────────────────
 
 """
@@ -214,21 +172,51 @@ function erg_loss(
     params = unpack_params(theta, base_params, fit_list)
 
     # Dark adapt with current params
-    u0_dark = try
-        _optim_dark_adapt(model, u0, params; tspan_dark=(0.0, 2000.0))
-    catch
-        return Inf
-    end
-
-    t_sim, sim_traces = simulate_erg(model, u0_dark, params, stimuli; tspan=tspan, dt=dt)
+    u0_dark = dark_adapt(model, u0, params; time = 2000.0, abstol=1e-6, reltol=1e-4)
+    t_sim, sim_traces = simulate_erg(model, u0_dark, params, stimuli; tspan=tspan, dt=dt, verbose=false)
     return mean_squared_error(t_sim, sim_traces, real_t, real_traces)
+end
+
+# ── Progress callback ────────────────────────────────────────
+
+"""
+    _make_progress_callback(phase_name; every=10)
+
+Return an Optim.jl callback that prints progress every `every` iterations.
+Tracks elapsed time and best loss seen so far.
+"""
+function _make_progress_callback(phase_name::String; every::Int=10)
+    best_loss = Ref(Inf)
+    t_start = Ref(time())
+    function callback(state)
+        if state.iteration == 0
+            t_start[] = time()
+            best_loss[] = state.value
+            return false
+        end
+        if state.value < best_loss[]
+            best_loss[] = state.value
+        end
+        if state.iteration % every == 0
+            elapsed = round(time() - t_start[], digits=1)
+            println(
+                "  [$phase_name] iter=$(state.iteration)  " *
+                "loss=$(round(state.value, sigdigits=6))  " *
+                "best=$(round(best_loss[], sigdigits=6))  " *
+                "elapsed=$(elapsed)s"
+            )
+        end
+        return false
+    end
+    return callback
 end
 
 # ── Main fitting function ────────────────────────────────────
 
 """
     fit_erg(model, u0, base_params; cell_types, stimuli, real_t, real_traces,
-            time_window, tspan, dt, nm_iterations, lbfgs_iterations, run_lbfgs, verbose)
+            time_window, tspan, dt, optimizer, n_particles,
+            phase1_iterations, lbfgs_iterations, run_lbfgs, verbose)
 
 Fit ERG model parameters to real data using staged optimization.
 
@@ -238,7 +226,9 @@ Fit ERG model parameters to real data using staged optimization.
 - `real_t`: Vector of time vectors (one per intensity), from ElectroPhysiology.jl
 - `real_traces`: Vector of trace vectors (one per intensity)
 - `time_window`: retained for backward compatibility; currently ignored
-- `nm_iterations`: NelderMead iterations (default 500)
+- `optimizer`: Phase 1 optimizer — `:particle_swarm` (default), `:nelder_mead`, or `:samin`
+- `n_particles`: particle count for PSO (default `3 * n_params`)
+- `phase1_iterations`: Phase 1 iterations (default 500)
 - `lbfgs_iterations`: LBFGS iterations (default 100)
 - `run_lbfgs`: whether to run LBFGS refinement phase (default true)
 
@@ -262,23 +252,36 @@ function fit_erg(
     time_window=(0.5, 1.5),
     tspan=(0.0, 6.0),
     dt=0.01,
-    nm_iterations=500,
+    optimizer::Symbol=:particle_swarm,
+    n_particles::Union{Int,Nothing}=nothing,
+    phase1_iterations=500,
+    nm_iterations=nothing,  # deprecated, use phase1_iterations
     lbfgs_iterations=100,
     run_lbfgs=true,
     verbose=true,
 )
+    # Handle deprecated nm_iterations kwarg
+    iters = nm_iterations !== nothing ? nm_iterations : phase1_iterations
+
     fit_list = fittable_params(cell_types)
     n_params = length(fit_list)
 
     if verbose
         println("Fitting $(n_params) parameters from cell types: $(cell_types)")
         println("Loss: full-waveform MSE, $(length(stimuli)) intensities")
+        println("Optimizer: $(optimizer)")
         for (i, (ct, key, spec)) in enumerate(fit_list)
             println("  [$i] $(ct).$(key) = $(spec.value) ∈ [$(spec.lower), $(spec.upper)]")
         end
     end
 
     theta0 = pack_params(base_params, fit_list)
+
+    # Build bounds vectors for bounded optimizers
+    lower_bounds = [_use_log_transform(spec) ? log(spec.lower) : spec.lower
+                    for (_, _, spec) in fit_list]
+    upper_bounds = [_use_log_transform(spec) ? log(spec.upper) : spec.upper
+                    for (_, _, spec) in fit_list]
 
     # Build objective closure
     objective = theta -> erg_loss(
@@ -291,20 +294,48 @@ function fit_erg(
     loss0 = objective(theta0)
     verbose && println("\nInitial loss: $(round(loss0, sigdigits=6))")
 
-    # Phase 1: NelderMead — derivative-free, robust to ODE instabilities
-    verbose && println("\n── Phase 1: NelderMead ($(nm_iterations) iterations) ──")
-    res_nm = Optim.optimize(
-        objective, theta0, NelderMead(),
-        Optim.Options(
-            iterations=nm_iterations,
-            show_trace=verbose,
-            show_every=50,
-            f_tol=1e-10,
-            x_tol=1e-8,
-        ),
-    )
-    theta_best = Optim.minimizer(res_nm)
-    verbose && println("NelderMead loss: $(round(Optim.minimum(res_nm), sigdigits=6))")
+    # Phase 1: derivative-free global search
+    if optimizer == :particle_swarm
+        np = something(n_particles, 3 * n_params)
+        verbose && println("\n── Phase 1: ParticleSwarm ($np particles, $iters iterations) ──")
+        res_phase1 = Optim.optimize(
+            objective, lower_bounds, upper_bounds, theta0,
+            ParticleSwarm(n_particles=np),
+            Optim.Options(
+                iterations=iters,
+                show_trace=false,
+                callback=verbose ? _make_progress_callback("PSO"; every=10) : nothing,
+                f_tol=1e-10,
+            ),
+        )
+    elseif optimizer == :samin
+        verbose && println("\n── Phase 1: SimulatedAnnealing ($iters iterations) ──")
+        res_phase1 = Optim.optimize(
+            objective, lower_bounds, upper_bounds, theta0,
+            SAMIN(),
+            Optim.Options(
+                iterations=iters,
+                show_trace=false,
+                callback=verbose ? _make_progress_callback("SAMIN"; every=50) : nothing,
+            ),
+        )
+    elseif optimizer == :nelder_mead
+        verbose && println("\n── Phase 1: NelderMead ($iters iterations) ──")
+        res_phase1 = Optim.optimize(
+            objective, theta0, NelderMead(),
+            Optim.Options(
+                iterations=iters,
+                show_trace=false,
+                callback=verbose ? _make_progress_callback("NelderMead"; every=50) : nothing,
+                f_tol=1e-10,
+                x_tol=1e-8,
+            ),
+        )
+    else
+        error("Unknown optimizer: $optimizer. Use :particle_swarm, :nelder_mead, or :samin")
+    end
+    theta_best = Optim.minimizer(res_phase1)
+    verbose && println("Phase 1 loss: $(round(Optim.minimum(res_phase1), sigdigits=6))")
 
     # Phase 2: LBFGS — gradient-based refinement near optimum
     res_lbfgs = nothing
@@ -315,8 +346,8 @@ function fit_erg(
                 objective, theta_best, LBFGS(),
                 Optim.Options(
                     iterations=lbfgs_iterations,
-                    show_trace=verbose,
-                    show_every=20,
+                    show_trace=false,
+                    callback=verbose ? _make_progress_callback("LBFGS"; every=20) : nothing,
                     f_tol=1e-12,
                     x_tol=1e-10,
                 ),
@@ -324,16 +355,16 @@ function fit_erg(
             theta_best = Optim.minimizer(res_lbfgs)
             verbose && println("LBFGS loss: $(round(Optim.minimum(res_lbfgs), sigdigits=6))")
         catch
-            verbose && println("LBFGS failed, using NelderMead result")
+            verbose && println("LBFGS failed, using Phase 1 result")
         end
     end
 
     # Reconstruct final params and simulate
     best_params = unpack_params(theta_best, base_params, fit_list)
-    u0_dark = _optim_dark_adapt(model, u0, best_params)
+    u0_dark = dark_adapt(model, u0, best_params; time=2000.0, abstol=1e-6, reltol=1e-4)
     t_sim, sim_traces = simulate_erg(model, u0_dark, best_params, stimuli; tspan=tspan, dt=dt)
 
-    final_loss = res_lbfgs !== nothing ? Optim.minimum(res_lbfgs) : Optim.minimum(res_nm)
+    final_loss = res_lbfgs !== nothing ? Optim.minimum(res_lbfgs) : Optim.minimum(res_phase1)
 
     # Uncertainty estimation
     verbose && println("\n── Estimating parameter uncertainty ──")
@@ -341,9 +372,10 @@ function fit_erg(
     verbose && println(unc)
 
     convergence_info = (
-        nm_converged = Optim.converged(res_nm),
-        nm_iterations = Optim.iterations(res_nm),
-        nm_loss = Optim.minimum(res_nm),
+        optimizer = optimizer,
+        phase1_converged = Optim.converged(res_phase1),
+        phase1_iterations = Optim.iterations(res_phase1),
+        phase1_loss = Optim.minimum(res_phase1),
         lbfgs_converged = res_lbfgs !== nothing ? Optim.converged(res_lbfgs) : missing,
         lbfgs_loss = res_lbfgs !== nothing ? Optim.minimum(res_lbfgs) : missing,
         initial_loss = loss0,
@@ -597,4 +629,41 @@ function save_fit_datasheet(result::NamedTuple, path::AbstractString)
     mkpath(dirname(path))
     CSV.write(path, result.uncertainty)
     return path
+end
+
+"""
+    save_fitted_params_csv(result, out_csv; template_csv=default_param_csv_path())
+
+Save a full parameter CSV in the same schema as `retinal_params.csv`, replacing
+`Value` entries for parameters that were fit in `result`.
+"""
+function save_fitted_params_csv(
+    result::NamedTuple,
+    out_csv::AbstractString;
+    template_csv::AbstractString=default_param_csv_path(),
+)
+    hasproperty(result, :params) || error("`result` is missing `params`.")
+    hasproperty(result, :fit_list) || error("`result` is missing `fit_list`.")
+
+    df = CSV.read(template_csv, DataFrame)
+    (:CellType in propertynames(df) && :Key in propertynames(df) && :Value in propertynames(df)) ||
+        error("Template CSV must contain `CellType`, `Key`, and `Value` columns.")
+
+    fitted_vals = Dict{Tuple{String,String},Float64}()
+    for (ct, key, _) in result.fit_list
+        cell_block = getproperty(result.params, ct)
+        fitted_vals[(uppercase(String(ct)), String(key))] = Float64(getproperty(cell_block, key))
+    end
+
+    for row in eachrow(df)
+        ct = uppercase(strip(string(row.CellType)))
+        key = strip(string(row.Key))
+        if haskey(fitted_vals, (ct, key))
+            row.Value = fitted_vals[(ct, key)]
+        end
+    end
+
+    mkpath(dirname(out_csv))
+    CSV.write(out_csv, df)
+    return out_csv
 end

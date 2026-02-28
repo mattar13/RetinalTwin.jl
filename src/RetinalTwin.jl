@@ -3,6 +3,7 @@ module RetinalTwin
 using LinearAlgebra
 using JSON
 using Statistics
+using Distributions
 
 # --- Core types ---
 # --- Default parameters ---
@@ -42,10 +43,14 @@ include("cells/rpe.jl")
 export rpe_state, rpe_model!, I_rpe
 
 #--- Circuit Mapping
-include("circuit/mapping.jl")   
+include("structure/mapping.jl")
+include("structure/column_builder.jl")
 export CellRef, RetinalColumnModel, global_idx, display_global_idxs
-export cell_range, uview, duview, get_out, connect!, square_grid_coords, build_column
+export cell_range, uview, duview, get_out, connect!, square_grid_coords
+export build_column, default_build_column, build_photoreceptor_column
 export save_mapping, load_mapping
+export align_grid!, align_circle!, align_random!
+export connect_populations!, pool_connections!
 
 
 # --- Circuit wiring ---
@@ -71,7 +76,7 @@ export
 
 # --- Convienance functions ---
 include("utils/convienance_functions.jl")
-export dark_adapt
+export dark_adapt, simulate_erg
 
 # --- Stimulus protocols ---
 include("stimulus_protocols/single_flash.jl")
@@ -82,13 +87,13 @@ export make_uniform_flash_stimulus, exponential_spot_stimulus, make_exponential_
 # --- Fitting ---
 include("fitting/fitting.jl")
 include("fitting/gradients.jl")
-include("fitting/staged_pipeline.jl")
+# include("fitting/staged_pipeline.jl")
 include("fitting/optim_fitting.jl")
 export hill_ir, fit_hill_ir, calculate_ir_gradient, run_gradient_calculation
 export ERGDataSet, ERGFeatures, ParameterTarget, StageDefinition, StageResult, StagedFitResult
 export load_erg_data, preprocess_erg, extract_erg_features, make_target, default_stages
 export fit_retinal_twin_staged, save_fit_datasheet, plot_fit_diagnostics, simulate_erg_dataset
-export fittable_params, fit_erg, simulate_erg
+export fittable_params, fit_erg, simulate_erg, save_fitted_params_csv
 
 # # --- ERG ---
 include("circuit/field_potential.jl")

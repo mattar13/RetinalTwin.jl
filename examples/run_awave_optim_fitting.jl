@@ -49,13 +49,14 @@ stimulus_model = map(x -> (duration = x.flash_duration, intensity = nd_filter(pe
 
 real_dataset.data_array = real_dataset.data_array[sorted_idx, :, :]
 
-#%% 3) Build model + parameter set for BaCl+LAP4-like blocked components
+#%% 3) Load model structure + parameter set for BaCl+LAP4-like blocked components
 #
-# Goal: photoreceptor-dominant response (a-wave focused), while preserving the
-# full ERG depth map and cell architecture.
-# - ON bipolar signaling blocked (LAP4-like) via TRPM1 conductance.
-# - OFF bipolar signaling blocked via iGluR conductance.
-# - Müller glia component blocked (BaCl-like) via Kir conductances.
+# Model structure is built once by running:
+#   examples/structure/just_photoreceptor_column.jl
+#
+# Goal: photoreceptor-dominant response (a-wave focused).
+# Parameters zero out downstream cell conductances for completeness,
+# but the loaded column contains only PC + HC cells.
 # -----------------------------------------------------------------------------
 params_dict = load_all_params(editable = true)
 
@@ -66,18 +67,8 @@ params_dict[:MULLER][:g_Kir_stalk] = 0.0
 
 params = dict_to_namedtuple(params_dict)
 
-pc_coords = square_grid_coords(16)
-model, u0 = build_column(
-    nPC=16,
-    nHC=4,
-    nONBC=4,
-    onbc_pool_size=4,
-    nOFFBC=4,
-    nA2=4,
-    nGC=1,
-    nMG=4,
-    pc_coords=pc_coords,
-)
+col_path = joinpath(@__DIR__, "structure", "photoreceptor_column.json")
+model, u0 = load_mapping(col_path)
 
 println("\nCells in model: ", ordered_cells(model))
 println("Total states: ", length(u0))
@@ -91,20 +82,21 @@ println("=" ^ 70)
 result = fit_erg(
     model, u0, params;
     cell_types = [:PHOTO],
-    stimuli = stimuli,
+    stimuli = stimulus_model,
     real_t = real_t,
     real_traces = real_traces,
     time_window = response_window,
     tspan = (0.0, 6.0),
     dt = 0.01,
-    nm_iterations = 500,
+    optimizer = :particle_swarm,
+    phase1_iterations = 300,
     lbfgs_iterations = 100,
     run_lbfgs = true,
     verbose = true,
 )
 
-# ─── 6) Generate outputs ─────────────────────────────────────────────────────
-
+#%% ─── 6) Generate outputs ─────────────────────────────────────────────────────
+ 
 outdir = joinpath(@__DIR__, "output", "awave_optim_fit")
 
 plots = plot_fit_diagnostics(
@@ -114,15 +106,21 @@ plots = plot_fit_diagnostics(
 )
 
 datasheet_path = save_fit_datasheet(result, joinpath(outdir, "awave_fit_params.csv"))
+fitted_param_csv_path = save_fitted_params_csv(
+    result,
+    joinpath(outdir, "awave_fit_retinal_params.csv");
+    template_csv = default_param_csv_path(),
+)
 
 println("\n" * "=" ^ 70)
 println("Fitting complete!")
 println("=" ^ 70)
 println("\nConvergence:")
-println("  Initial loss: $(result.convergence.initial_loss)")
-println("  Final loss:   $(result.convergence.final_loss)")
-println("  NM converged: $(result.convergence.nm_converged)")
-println("  LBFGS converged: $(result.convergence.lbfgs_converged)")
+println("  Optimizer:       $(result.convergence.optimizer)")
+println("  Initial loss:    $(result.convergence.initial_loss)")
+println("  Final loss:      $(result.convergence.final_loss)")
+println("  Phase 1 converged: $(result.convergence.phase1_converged)")
+println("  LBFGS converged:  $(result.convergence.lbfgs_converged)")
 
 println("\nOutputs:")
 println("  Traces plot:       $(plots.traces)")
@@ -132,9 +130,10 @@ if !isempty(plots.correlations)
     println("  Correlations plot: $(plots.correlations)")
 end
 println("  Datasheet:         $(datasheet_path)")
+println("  Fitted params CSV: $(fitted_param_csv_path)")
 
-println("\nTop 10 most certain parameters:")
-sorted_unc = sort(result.uncertainty, :certainty, rev=true)
-for row in first(eachrow(sorted_unc), 10)
-    println("  $(row.parameter): $(round(row.estimate, sigdigits=4)) ± $(round(row.std_error, sigdigits=3)) (certainty=$(round(row.certainty, digits=3)))")
-end
+# println("\nTop 10 most certain parameters:")
+# sorted_unc = sort(result.uncertainty, :certainty, rev=true)
+# for row in first(eachrow(sorted_unc), 10)
+#     println("  $(row.parameter): $(round(row.estimate, sigdigits=4)) ± $(round(row.std_error, sigdigits=3)) (certainty=$(round(row.certainty, digits=3)))")
+# end
