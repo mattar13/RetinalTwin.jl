@@ -177,38 +177,51 @@ function erg_loss(
     return mean_squared_error(t_sim, sim_traces, real_t, real_traces)
 end
 
-# ── Progress callback ────────────────────────────────────────
+# ── Progress tracking ────────────────────────────────────────
 
 """
-    _make_progress_callback(phase_name; every=10)
+    _make_tracked_objective(objective, phase_name; every=5, checkpoint_every=0, checkpoint_fn=nothing)
 
-Return an Optim.jl callback that prints progress every `every` iterations.
-Tracks elapsed time and best loss seen so far.
+Wrap an objective function with an evaluation counter that:
+- Prints progress every `every` calls
+- Calls `checkpoint_fn(best_theta, eval_n)` every `checkpoint_every` calls (0 = disabled)
+
+Tracks the best `theta` seen so far so checkpoints always save the current optimum.
 """
-function _make_progress_callback(phase_name::String; every::Int=10)
+function _make_tracked_objective(
+    objective, phase_name::String;
+    every::Int=5,
+    checkpoint_every::Int=0,
+    checkpoint_fn=nothing,
+)
+    eval_count = Ref(0)
     best_loss = Ref(Inf)
-    t_start = Ref(time())
-    function callback(state)
-        if state.iteration == 0
-            t_start[] = time()
-            best_loss[] = state.value
-            return false
+    best_theta = Ref(Float64[])
+    t_start = time()
+    function tracked(theta)
+        loss = objective(theta)
+        eval_count[] += 1
+        if loss < best_loss[]
+            best_loss[] = loss
+            best_theta[] = copy(theta)
         end
-        if state.value < best_loss[]
-            best_loss[] = state.value
-        end
-        if state.iteration % every == 0
-            elapsed = round(time() - t_start[], digits=1)
+        n = eval_count[]
+        if n % every == 0
+            elapsed = round(time() - t_start, digits=1)
             println(
-                "  [$phase_name] iter=$(state.iteration)  " *
-                "loss=$(round(state.value, sigdigits=6))  " *
+                "  [$phase_name] eval=$n  " *
+                "loss=$(round(loss, sigdigits=6))  " *
                 "best=$(round(best_loss[], sigdigits=6))  " *
                 "elapsed=$(elapsed)s"
             )
+            flush(stdout)
         end
-        return false
+        if checkpoint_every > 0 && checkpoint_fn !== nothing && n % checkpoint_every == 0
+            checkpoint_fn(best_theta[], n)
+        end
+        return loss
     end
-    return callback
+    return tracked
 end
 
 # ── Main fitting function ────────────────────────────────────
@@ -226,11 +239,13 @@ Fit ERG model parameters to real data using staged optimization.
 - `real_t`: Vector of time vectors (one per intensity), from ElectroPhysiology.jl
 - `real_traces`: Vector of trace vectors (one per intensity)
 - `time_window`: retained for backward compatibility; currently ignored
-- `optimizer`: Phase 1 optimizer — `:particle_swarm` (default), `:nelder_mead`, or `:samin`
-- `n_particles`: particle count for PSO (default `3 * n_params`)
+- `optimizer`: Phase 1 optimizer — `:nelder_mead` (default), `:particle_swarm`, or `:samin`
+- `n_particles`: particle count for PSO (default `3 * n_params`; note PSO evaluates all particles per iteration, making it slow for expensive ODE objectives)
 - `phase1_iterations`: Phase 1 iterations (default 500)
 - `lbfgs_iterations`: LBFGS iterations (default 100)
 - `run_lbfgs`: whether to run LBFGS refinement phase (default true)
+- `checkpoint_every`: save best-so-far params every N evaluations (default 100; 0 = disabled)
+- `checkpoint_dir`: directory for checkpoint CSVs (default `"checkpoints"` relative to cwd)
 
 # Returns
 NamedTuple with fields:
@@ -252,12 +267,15 @@ function fit_erg(
     time_window=(0.5, 1.5),
     tspan=(0.0, 6.0),
     dt=0.01,
-    optimizer::Symbol=:particle_swarm,
+    optimizer::Symbol=:nelder_mead,
     n_particles::Union{Int,Nothing}=nothing,
     phase1_iterations=500,
     nm_iterations=nothing,  # deprecated, use phase1_iterations
     lbfgs_iterations=100,
     run_lbfgs=true,
+    checkpoint_every::Int=100,
+    checkpoint_dir::String="checkpoints",
+    show_trace=false,
     verbose=true,
 )
     # Handle deprecated nm_iterations kwarg
@@ -283,56 +301,66 @@ function fit_erg(
     upper_bounds = [_use_log_transform(spec) ? log(spec.upper) : spec.upper
                     for (_, _, spec) in fit_list]
 
-    # Build objective closure
+    # Build objective closure (plain, no tracking)
     objective = theta -> erg_loss(
         theta, model, u0, base_params, fit_list, stimuli,
         real_t, real_traces;
         time_window=time_window, tspan=tspan, dt=dt,
     )
 
+    # Build checkpoint closure — saves best params seen so far as a CSV
+    ckpt_path = joinpath(checkpoint_dir, "fit_checkpoint_$(optimizer)_best.csv")
+    function _do_checkpoint(best_theta, eval_n)
+        try
+            mkpath(checkpoint_dir)
+            save_fitted_params_csv(
+                (params=unpack_params(best_theta, base_params, fit_list), fit_list=fit_list),
+                ckpt_path,
+            )
+            verbose && println("  [checkpoint] eval=$eval_n → $ckpt_path")
+            flush(stdout)
+        catch e
+            verbose && println("  [checkpoint] save failed: $e")
+        end
+    end
+    ckpt_fn = checkpoint_every > 0 ? _do_checkpoint : nothing
+
     # Check initial loss
     loss0 = objective(theta0)
     verbose && println("\nInitial loss: $(round(loss0, sigdigits=6))")
 
     # Phase 1: derivative-free global search
+    # Wrap objective with eval counter so progress (and checkpoints) fire every N evals
     if optimizer == :particle_swarm
         np = something(n_particles, 3 * n_params)
         verbose && println("\n── Phase 1: ParticleSwarm ($np particles, $iters iterations) ──")
+        verbose && println("  Note: PSO evaluates all $np particles per iteration before reporting progress.")
+        obj1 = _make_tracked_objective(objective, "PSO";
+            every=np, checkpoint_every=checkpoint_every, checkpoint_fn=ckpt_fn)
         res_phase1 = Optim.optimize(
-            objective, lower_bounds, upper_bounds, theta0,
+            obj1, lower_bounds, upper_bounds, theta0,
             ParticleSwarm(n_particles=np),
-            Optim.Options(
-                iterations=iters,
-                show_trace=false,
-                callback=verbose ? _make_progress_callback("PSO"; every=10) : nothing,
-                f_tol=1e-10,
-            ),
+            Optim.Options(iterations=iters, show_trace=show_trace, f_reltol=1e-10),
         )
     elseif optimizer == :samin
         verbose && println("\n── Phase 1: SimulatedAnnealing ($iters iterations) ──")
+        obj1 = _make_tracked_objective(objective, "SAMIN";
+            every=5, checkpoint_every=checkpoint_every, checkpoint_fn=ckpt_fn)
         res_phase1 = Optim.optimize(
-            objective, lower_bounds, upper_bounds, theta0,
+            obj1, lower_bounds, upper_bounds, theta0,
             SAMIN(),
-            Optim.Options(
-                iterations=iters,
-                show_trace=false,
-                callback=verbose ? _make_progress_callback("SAMIN"; every=50) : nothing,
-            ),
+            Optim.Options(iterations=iters, show_trace=show_trace),
         )
     elseif optimizer == :nelder_mead
         verbose && println("\n── Phase 1: NelderMead ($iters iterations) ──")
+        obj1 = _make_tracked_objective(objective, "NelderMead";
+            every=5, checkpoint_every=checkpoint_every, checkpoint_fn=ckpt_fn)
         res_phase1 = Optim.optimize(
-            objective, theta0, NelderMead(),
-            Optim.Options(
-                iterations=iters,
-                show_trace=false,
-                callback=verbose ? _make_progress_callback("NelderMead"; every=50) : nothing,
-                f_tol=1e-10,
-                x_tol=1e-8,
-            ),
+            obj1, theta0, NelderMead(),
+            Optim.Options(iterations=iters, show_trace=show_trace, f_reltol=1e-10, x_reltol=1e-8),
         )
     else
-        error("Unknown optimizer: $optimizer. Use :particle_swarm, :nelder_mead, or :samin")
+        error("Unknown optimizer: $optimizer. Use :nelder_mead, :particle_swarm, or :samin")
     end
     theta_best = Optim.minimizer(res_phase1)
     verbose && println("Phase 1 loss: $(round(Optim.minimum(res_phase1), sigdigits=6))")
@@ -342,15 +370,11 @@ function fit_erg(
     if run_lbfgs
         verbose && println("\n── Phase 2: LBFGS ($(lbfgs_iterations) iterations) ──")
         try
+            obj2 = _make_tracked_objective(objective, "LBFGS";
+                every=5, checkpoint_every=checkpoint_every, checkpoint_fn=ckpt_fn)
             res_lbfgs = Optim.optimize(
-                objective, theta_best, LBFGS(),
-                Optim.Options(
-                    iterations=lbfgs_iterations,
-                    show_trace=false,
-                    callback=verbose ? _make_progress_callback("LBFGS"; every=20) : nothing,
-                    f_tol=1e-12,
-                    x_tol=1e-10,
-                ),
+                obj2, theta_best, LBFGS(),
+                Optim.Options(iterations=lbfgs_iterations, show_trace=show_trace, f_reltol=1e-12, x_reltol=1e-10),
             )
             theta_best = Optim.minimizer(res_lbfgs)
             verbose && println("LBFGS loss: $(round(Optim.minimum(res_lbfgs), sigdigits=6))")

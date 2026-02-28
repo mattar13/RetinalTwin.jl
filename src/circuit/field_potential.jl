@@ -30,7 +30,7 @@ function load_erg_depth_map(csv_path::AbstractString=default_depth_csv_path())
         weight = hasproperty(row, :weight) ? Float64(getproperty(row, :weight)) :
                  (hasproperty(row, :Weight) ? Float64(getproperty(row, :Weight)) : 1.0)
 
-        push!(out, (cell_type=lowercase(strip(cell_type)), current=Symbol(strip(current)), z=z, weight=weight))
+        push!(out, (cell_type=strip(cell_type), current=Symbol(strip(current)), z=z, weight=weight))
     end
     return out
 end
@@ -41,27 +41,27 @@ load_depth_scales(csv_path::AbstractString=default_depth_csv_path()) = load_erg_
 
 @inline function _cell_type_label(cell_type::Symbol)
     if cell_type == :PC
-        return "photoreceptor"
+        return "PHOTO"
     elseif cell_type == :HC
-        return "horizontal"
+        return "HC"
     elseif cell_type == :ONBC
-        return "on_bipolar"
+        return "ONBC"
     elseif cell_type == :OFFBC
-        return "off_bipolar"
+        return "OFFBC"
     elseif cell_type == :A2
-        return "a2_amacrine"
+        return "A2"
     elseif cell_type == :GC
-        return "ganglion"
+        return "GC"
     elseif cell_type == :MG
-        return "muller"
+        return "MULLER"
     elseif cell_type == :RPE
-        return "rpe"
+        return "RPE"
     elseif cell_type == :GABA
-        return "gaba_amacrine"
+        return "GABA"
     elseif cell_type == :DA
-        return "da_amacrine"
+        return "DA"
     else
-        return lowercase(String(cell_type))
+        return String(cell_type)
     end
 end
 
