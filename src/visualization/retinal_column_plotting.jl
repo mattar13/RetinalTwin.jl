@@ -148,7 +148,19 @@ function plot_cell_layout_3d(
     z_stim::Real=0.0,
 )
     names = ordered_cells_by_type(model)
-    z_depth = Dict{Symbol,Float64}(k => Float64(v) for (k, v) in RETINAL_LAYER_DEPTH)
+
+    # Load depth map and compute (z_min, z_max) per cell type
+    depth_rows = load_erg_depth_map()
+    function _z_range(ct::Symbol)
+        label = _cell_type_label(ct)
+        zs = [r.z for r in depth_rows if r.cell_type == label]
+        if isempty(zs)
+            z_fallback = Float64(get(RETINAL_LAYER_DEPTH, ct, 0.0))
+            return (z_fallback, z_fallback)
+        end
+        return (minimum(zs), maximum(zs))
+    end
+
     present_types_all = present_cell_types(model; names=names)
     present_types = Symbol[ct for ct in RETINAL_CELL_TYPE_ORDER if ct in present_types_all]
     for ct in present_types_all
@@ -186,12 +198,19 @@ function plot_cell_layout_3d(
         coords_by_type[ct] = _coords_for_names(model, names_by_type[ct]; xbounds=(xlo, xhi), ybounds=(ylo, yhi))
     end
 
+    z_range_by_type = Dict{Symbol,Tuple{Float64,Float64}}()
+    for ct in present_types
+        z_range_by_type[ct] = _z_range(ct)
+    end
+
+    # Use z_mid for connection lines and scatter markers
     coord_by_name = Dict{Symbol,NTuple{3,Float64}}()
     for ct in present_types
         xs, ys = coords_by_type[ct]
-        z = Float64(get(z_depth, ct, 0.0))
+        z_lo, z_hi = z_range_by_type[ct]
+        z_mid = (z_lo + z_hi) / 2
         for (i, nm) in enumerate(names_by_type[ct])
-            coord_by_name[nm] = (xs[i], ys[i], z)
+            coord_by_name[nm] = (xs[i], ys[i], z_mid)
         end
     end
 
@@ -200,7 +219,7 @@ function plot_cell_layout_3d(
         fig[1, 1],
         xlabel="x",
         ylabel="y",
-        zlabel="Layer",
+        zlabel="Depth",
         title="Retinal Cell Layout (3D Layers)",
         azimuth=0.8,
         elevation=0.35,
@@ -208,17 +227,17 @@ function plot_cell_layout_3d(
 
     if stimulus_func !== nothing
         ngrid = max(2, Int(stimulus_grid_n))
-        xs = collect(range(xlo, xhi; length=ngrid))
-        ys = collect(range(ylo, yhi; length=ngrid))
+        xs_grid = collect(range(xlo, xhi; length=ngrid))
+        ys_grid = collect(range(ylo, yhi; length=ngrid))
         z_plane = fill(Float64(z_stim), ngrid, ngrid)
         stim_vals = Matrix{Float64}(undef, ngrid, ngrid)
         for i in 1:ngrid, j in 1:ngrid
-            stim_vals[i, j] = Float64(stimulus_func(Float64(stimulus_time), xs[i], ys[j]))
+            stim_vals[i, j] = Float64(stimulus_func(Float64(stimulus_time), xs_grid[i], ys_grid[j]))
         end
         surface!(
             ax,
-            xs,
-            ys,
+            xs_grid,
+            ys_grid,
             z_plane;
             color=stim_vals,
             alpha=0.5,
@@ -231,7 +250,7 @@ function plot_cell_layout_3d(
     for (receiver, pres) in sort!(collect(model.connections), by=first)
         haskey(coord_by_name, receiver) || continue
         x1, y1, z1 = coord_by_name[receiver]
-        for (pre, _release, w) in pres
+        for (pre, _, w) in pres
             haskey(coord_by_name, pre) || continue
             x0, y0, z0 = coord_by_name[pre]
             lines!(
@@ -245,16 +264,37 @@ function plot_cell_layout_3d(
         end
     end
 
+    # Draw vertical depth spans for each cell (x,y from CellRef; z range from depth map)
+    for ct in present_types
+        xs, ys = coords_by_type[ct]
+        isempty(xs) && continue
+        z_lo, z_hi = z_range_by_type[ct]
+        abs(z_hi - z_lo) < 1e-6 && continue
+        st = get(style_by_type, ct, (color=:black, marker=:circle, markersize=14, label=String(ct)))
+        n = length(xs)
+        seg_xs = Vector{Float64}(undef, 2n)
+        seg_ys = Vector{Float64}(undef, 2n)
+        seg_zs = Vector{Float64}(undef, 2n)
+        for i in 1:n
+            seg_xs[2i-1] = xs[i]; seg_xs[2i] = xs[i]
+            seg_ys[2i-1] = ys[i]; seg_ys[2i] = ys[i]
+            seg_zs[2i-1] = z_lo;  seg_zs[2i] = z_hi
+        end
+        linesegments!(ax, seg_xs, seg_ys, seg_zs; color=(st.color, 0.5), linewidth=4.0)
+    end
+
+    # Scatter markers at z_mid for each cell type
     for ct in present_types
         xs, ys = coords_by_type[ct]
         isempty(xs) && continue
         st = get(style_by_type, ct, (color=:black, marker=:circle, markersize=14, label=String(ct)))
-        z = Float64(get(z_depth, ct, 0.0))
+        z_lo, z_hi = z_range_by_type[ct]
+        z_mid = (z_lo + z_hi) / 2
         scatter!(
             ax,
             xs,
             ys,
-            fill(z, length(xs));
+            fill(z_mid, length(xs));
             markersize=st.markersize,
             color=st.color,
             marker=st.marker,
@@ -265,9 +305,10 @@ function plot_cell_layout_3d(
     ztick_vals = Float64[]
     ztick_labels = String[]
     for ct in present_types
-        z = Float64(get(z_depth, ct, 0.0))
-        if !(z in ztick_vals)
-            push!(ztick_vals, z)
+        z_lo, z_hi = z_range_by_type[ct]
+        z_mid = (z_lo + z_hi) / 2
+        if !(z_mid in ztick_vals)
+            push!(ztick_vals, z_mid)
             push!(ztick_labels, String(ct))
         end
     end
