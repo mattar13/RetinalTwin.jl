@@ -1,0 +1,288 @@
+CellType,Key,Value,LowerBounds,UpperBounds,Fixed,Description
+A2,C_m,30.0,27.0,33.0,true,Membrane capacitance (pF)
+A2,I_app,0.0,0.0,0.0,true,Applied current (pA)
+A2,g_L,1.0,0.9,1.1,false,
+A2,E_L,-55.0,-60.5,-49.5,true,Leak reversal potential (mV)
+A2,g_Kv,4.0,3.6,4.4,false,
+A2,E_K,-85.0,-93.5,-76.5,true,K+ reversal potential (mV)
+A2,Vn_half,-30.0,-33.0,-27.0,false,
+A2,kn_slope,9.0,8.1,9.9,false,
+A2,tau_n,8.0,7.2,8.8,false,
+A2,g_h,1.0,0.9,1.1,false,
+A2,E_h,-35.0,-38.5,-31.5,true,Ih reversal potential (mV)
+A2,Vh_half,-80.0,-88.0,-72.0,false,
+A2,kh_slope,-8.0,-8.8,-7.2,false,
+A2,tau_h,80.0,72.0,88.0,false,
+A2,g_CaL,0.8,0.72,0.88,false,
+A2,E_Ca,60.0,54.0,66.0,true,Ca2+ reversal potential (mV)
+A2,Vm_half,-48.0,-52.8,-43.2,false,
+A2,km_slope,7.0,6.3,7.7,false,
+A2,tau_c,40.0,36.0,44.0,false,
+A2,k_c,0.005,0.0045,0.0055,false,
+A2,g_KCa,1.5,1.35,1.65,false,
+A2,K_c,0.5,0.45,0.55,false,
+A2,n_c,2.0,1.8,2.2,false,
+A2,g_iGluR,12.0,10.8,13.2,false,
+A2,E_iGluR,0.0,0.0,0.0,true,iGluR reversal potential (mV)
+A2,K_a,0.7,0.63,0.77,false,
+A2,n_a,2.0,1.8,2.2,false,
+A2,a_a,1.0,0.9,1.1,false,
+A2,tau_A,2.0,1.8,2.2,false,
+A2,K_d,0.8,0.72,0.88,false,
+A2,n_d,2.0,1.8,2.2,false,
+A2,a_d,1.0,0.9,1.1,false,
+A2,tau_d,50.0,45.0,55.0,false,
+A2,K_Release,0.6,0.54,0.66,false,
+A2,n_Release,3.0,2.7,3.3,false,
+A2,a_Release,0.5,0.45,0.55,false,
+A2,tau_Release,5.0,4.5,5.5,false,
+A2,g_gap,1.0,0.9,1.1,false,
+DA,C_m,20.0,18.0,22.0,true,Membrane capacitance (pF)
+DA,I_app,0.0,0.0,0.0,true,Applied current (pA)
+DA,g_L,2.0,1.8,2.2,false,
+DA,g_Ca,4.0,3.6,4.4,false,
+DA,g_K,8.0,7.2,8.8,false,
+DA,E_L,-60.0,-66.0,-54.0,true,Leak reversal potential (mV)
+DA,E_Ca,120.0,108.0,132.0,true,Ca2+ reversal potential (mV)
+DA,E_K,-84.0,-92.4,-75.6,true,K+ reversal potential (mV)
+DA,V1,-1.2,-1.32,-1.08,false,
+DA,V2,18.0,16.2,19.8,false,
+DA,V3,12.0,10.8,13.2,false,
+DA,V4,17.0,15.3,18.7,false,
+DA,phi,0.067,0.0603,0.0737,false,
+DA,alpha_DA,1.0,0.9,1.1,false,
+DA,V_DA_half,-20.0,-22.0,-18.0,false,
+DA,V_DA_slope,5.0,4.5,5.5,false,
+DA,tau_DA,200.0,180.0,220.0,false,
+GABA,C_m,10.0,9.0,11.0,true,Membrane capacitance (pF)
+GABA,I_app,0.0,0.0,0.0,true,Applied current (pA)
+GABA,g_L,2.0,1.8,2.2,false,
+GABA,g_Ca,8.0,7.2,8.8,false,
+GABA,g_K,12.0,10.8,13.2,false,
+GABA,E_L,-60.0,-66.0,-54.0,true,Leak reversal potential (mV)
+GABA,E_Ca,120.0,108.0,132.0,true,Ca2+ reversal potential (mV)
+GABA,E_K,-84.0,-92.4,-75.6,true,K+ reversal potential (mV)
+GABA,V1,-1.2,-1.32,-1.08,false,
+GABA,V2,18.0,16.2,19.8,false,
+GABA,V3,-8.0,-8.8,-7.2,false,
+GABA,V4,12.0,10.8,13.2,false,
+GABA,phi,0.15,0.135,0.165,false,
+GABA,alpha_GABA,1.0,0.9,1.1,false,
+GABA,V_GABA_half,-20.0,-22.0,-18.0,false,
+GABA,V_GABA_slope,5.0,4.5,5.5,false,
+GABA,tau_GABA,7.0,6.3,7.7,false,
+GC,I_app,0.0,0.0,0.0,true,Applied current (pA)
+GC,C_m,0.2,0.18,0.22,true,Membrane capacitance (nF)
+GC,g_L,0.8,0.72,0.88,false,
+GC,E_L,-65.0,-71.5,-58.5,true,Leak reversal potential (mV)
+GC,g_Na,400.0,360.0,440.0,false,
+GC,E_Na,55.0,49.5,60.5,true,Na+ reversal potential (mV)
+GC,g_K,120.0,108.0,132.0,false,
+GC,E_K,-85.0,-93.5,-76.5,true,K+ reversal potential (mV)
+GC,g_E,5.0,4.5,5.5,false,
+GC,E_E,0.0,0.0,0.0,true,Excitatory reversal potential (mV)
+GC,tau_E,1.5,1.35,1.65,false,
+GC,K_preE,2.0,1.8,2.2,false,
+GC,n_preE,2.0,1.8,2.2,false,
+GC,a_preE,1.0,0.9,1.1,false,
+GC,g_I,0.0,0.0,0.0,false,
+GC,E_I,-70.0,-77.0,-63.0,true,Inhibitory reversal potential (mV)
+GC,tau_I,6.0,5.4,6.6,false,
+GC,K_preI,2.0,1.8,2.2,false,
+GC,n_preI,2.0,1.8,2.2,false,
+GC,a_preI,1.0,0.9,1.1,false,
+HC,C_m,20.0,18.0,22.0,true,Membrane capacitance (pF)
+HC,I_app,0.0,0.0,0.0,true,Applied current (pA)
+HC,g_L,2.0,1.8,2.2,false,
+HC,E_L,-60.0,-66.0,-54.0,true,Leak reversal potential (mV)
+HC,g_exc,8.0,7.2,8.8,false,
+HC,E_exc,0.0,0.0,0.0,true,Excitatory reversal potential (mV)
+HC,K_Glu,0.7,0.63,0.77,false,
+HC,n_Glu,2.0,1.8,2.2,false,
+HC,g_CaL,0.6,0.54,0.66,false,
+HC,E_Ca,60.0,54.0,66.0,true,Ca2+ reversal potential (mV)
+HC,Vm_half,-45.0,-49.5,-40.5,false,
+HC,km_slope,7.0,6.3,7.7,false,
+HC,tau_c,40.0,36.0,44.0,false,
+HC,k_c,0.005,0.0045,0.0055,false,
+HC,E_K,-84.0,-92.4,-75.6,true,K+ reversal potential (mV)
+HC,E_Kir,-84.0,-92.4,-75.6,true,Kir reversal potential (mV)
+HC,g_Kir,2.0,1.8,2.2,false,
+HC,Kir_Vshift,15.0,13.5,16.5,false,
+HC,Kir_k,6.0,5.4,6.6,false,
+HC,g_gap,1.0,0.9,1.1,false,
+HC,gBK,3.0,2.7,3.3,false,
+HC,Vhalf0_BK,-10.0,-11.0,-9.0,false,
+HC,k_BK,8.0,7.2,8.8,false,
+HC,s_BK,20.0,18.0,22.0,false,
+HC,Caref_BK,0.1,0.09,0.11,false,
+HC,K_Release,0.6,0.54,0.66,false,
+HC,n_Release,3.0,2.7,3.3,false,
+HC,a_Release,0.5,0.45,0.55,false,
+HC,tau_Release,5.0,4.5,5.5,false,
+MULLER,C_m,60.0,54.0,66.0,true,Membrane capacitance (pF)
+MULLER,g_L,0.2,0.18,0.22,false,
+MULLER,E_L,-65.0,-71.5,-58.5,true,Leak reversal potential (mV)
+MULLER,I_app,0.0,0.0,0.0,true,Applied current (pA)
+MULLER,K_i,140.0,126.0,154.0,true,Intracellular K+ concentration (mM)
+MULLER,K_o_rest,3.0,2.7,3.3,true,Resting extracellular K+ (mM)
+MULLER,g_Kir_end,40.0,36.0,44.0,false,
+MULLER,g_Kir_stalk,60.0,54.0,66.0,false,
+MULLER,Kir_Vshift,15.0,13.5,16.5,false,
+MULLER,Kir_k,6.0,5.4,6.6,false,
+MULLER,alpha_K,0.0002,0.00018,0.00022,false,
+MULLER,beta_K,0.001,0.0009,0.0011,false,
+MULLER,frac_end,0.3,0.27,0.33,false,
+MULLER,frac_stalk,0.7,0.63,0.77,false,
+MULLER,tau_K_diffusion,200.0,180.0,220.0,false,
+MULLER,V_max_EAAT,0.8,0.72,0.88,false,
+MULLER,K_m_EAAT,10.0,9.0,11.0,false,
+MULLER,n_EAAT,2.0,1.8,2.2,false,
+MULLER,g_EAAT,0.001,0.0009,0.0011,false,
+MULLER,dt_guard,0.1,0.09,0.11,true,Numerical guard parameter
+OFFBC,C_m,30.0,27.0,33.0,true,Membrane capacitance (pF)
+OFFBC,I_app,0.0,0.0,0.0,true,Applied current (pA)
+OFFBC,g_L,1.0,0.9,1.1,false,
+OFFBC,E_L,-55.0,-60.5,-49.5,true,Leak reversal potential (mV)
+OFFBC,g_Kv,4.0,3.6,4.4,false,
+OFFBC,E_K,-85.0,-93.5,-76.5,true,K+ reversal potential (mV)
+OFFBC,Vn_half,-30.0,-33.0,-27.0,false,
+OFFBC,kn_slope,9.0,8.1,9.9,false,
+OFFBC,tau_n,8.0,7.2,8.8,false,
+OFFBC,g_h,1.0,0.9,1.1,false,
+OFFBC,E_h,-35.0,-38.5,-31.5,true,Ih reversal potential (mV)
+OFFBC,Vh_half,-80.0,-88.0,-72.0,false,
+OFFBC,kh_slope,-8.0,-8.8,-7.2,false,
+OFFBC,tau_h,80.0,72.0,88.0,false,
+OFFBC,g_CaL,0.8,0.72,0.88,false,
+OFFBC,E_Ca,60.0,54.0,66.0,true,Ca2+ reversal potential (mV)
+OFFBC,Vm_half,-48.0,-52.8,-43.2,false,
+OFFBC,km_slope,7.0,6.3,7.7,false,
+OFFBC,tau_c,40.0,36.0,44.0,false,
+OFFBC,k_c,0.005,0.0045,0.0055,false,
+OFFBC,g_KCa,1.5,1.35,1.65,false,
+OFFBC,K_c,0.5,0.45,0.55,false,
+OFFBC,n_c,2.0,1.8,2.2,false,
+OFFBC,g_iGluR,12.0,10.8,13.2,false,
+OFFBC,E_iGluR,0.0,0.0,0.0,true,iGluR reversal potential (mV)
+OFFBC,K_a,0.7,0.63,0.77,false,
+OFFBC,n_a,2.0,1.8,2.2,false,
+OFFBC,a_a,1.0,0.9,1.1,false,
+OFFBC,tau_A,2.0,1.8,2.2,false,
+OFFBC,K_d,0.8,0.72,0.88,false,
+OFFBC,n_d,2.0,1.8,2.2,false,
+OFFBC,a_d,1.0,0.9,1.1,false,
+OFFBC,tau_d,50.0,45.0,55.0,false,
+OFFBC,K_Release,0.6,0.54,0.66,false,
+OFFBC,n_Release,3.0,2.7,3.3,false,
+OFFBC,a_Release,0.5,0.45,0.55,false,
+OFFBC,tau_Release,5.0,4.5,5.5,false,
+ONBC,C_m,30.0,27.0,33.0,true,Membrane capacitance (pF)
+ONBC,I_app,0.0,0.0,0.0,true,Applied current (pA)
+ONBC,g_L,1.0,0.9,1.1,false,
+ONBC,E_L,-55.0,-60.5,-49.5,true,Leak reversal potential (mV)
+ONBC,g_Kv,4.0,3.6,4.4,false,
+ONBC,E_K,-85.0,-93.5,-76.5,true,K+ reversal potential (mV)
+ONBC,Vn_half,-30.0,-33.0,-27.0,false,
+ONBC,kn_slope,9.0,8.1,9.9,false,
+ONBC,tau_n,8.0,7.2,8.8,false,
+ONBC,g_h,1.0,0.9,1.1,false,
+ONBC,E_h,-35.0,-38.5,-31.5,true,Ih reversal potential (mV)
+ONBC,Vh_half,-80.0,-88.0,-72.0,false,
+ONBC,kh_slope,-8.0,-8.8,-7.2,false,
+ONBC,tau_h,80.0,72.0,88.0,false,
+ONBC,g_CaL,0.8,0.72,0.88,false,
+ONBC,E_Ca,60.0,54.0,66.0,true,Ca2+ reversal potential (mV)
+ONBC,Vm_half,-35.0,-38.5,-31.5,false,
+ONBC,km_slope,7.0,6.3,7.7,false,
+ONBC,tau_m,3.0,2.7,3.3,false,
+ONBC,tau_c,2.0,1.8,2.2,false,
+ONBC,k_c,0.008,0.0072,0.0088,false,
+ONBC,g_KCa,1.5,1.35,1.65,false,
+ONBC,K_c,0.5,0.45,0.55,false,
+ONBC,n_c,2.0,1.8,2.2,false,
+ONBC,K_Glu,0.5,0.45,0.55,false,
+ONBC,n_Glu,5.0,4.5,5.5,false,
+ONBC,a_S,0.5,0.45,0.55,false,
+ONBC,tau_S,50.0,45.0,55.0,false,
+ONBC,g_TRPM1,5.0,4.5,5.5,false,
+ONBC,E_TRPM1,0.0,0.0,0.0,true,TRPM1 reversal potential (mV)
+ONBC,K_Release,0.4,0.36,0.44,false,
+ONBC,n_Release,4.0,3.6,4.4,false,
+ONBC,a_Release,2.0,1.8,2.2,false,
+ONBC,tau_Release,5.0,4.5,5.5,false,
+PHOTO,aC,0.011,0.009,0.011,false,
+PHOTO,kR1,439.99999999999983,360.0,440.0,false,
+PHOTO,kF1,11.0,9.0,11.0,false,
+PHOTO,kR2,110.0,90.0,110.0,false,
+PHOTO,kR3,12.628,10.332,12.628,false,
+PHOTO,kHYDRO,9899.999999999995,8100.0,9900.0,false,
+PHOTO,kREC,0.638,0.522,0.638,false,
+PHOTO,G0,1.9467077499478502,1.8,2.2,false,
+PHOTO,iDARK,5544.0000033,4536.0000027,5544.0000033,false,
+PHOTO,kg,11.0,9.0,11.0,false,
+PHOTO,R_tot,3.0815567628947473,2.7,3.3,false,
+PHOTO,T_tot,0.29339375252019056,0.27,0.33,false,
+PHOTO,P_tot,0.0231,0.0189,0.0231,false,
+PHOTO,lambda,0.6731160916398671,0.603,0.737,false,
+PHOTO,C_m,0.02,0.018,0.022,true,Membrane capacitance (nF)
+PHOTO,I_app,0.0,0.0,0.0,true,Applied current (pA)
+PHOTO,gLEAK,0.5044163821169698,0.45,0.55,false,
+PHOTO,ELEAK,77.0,69.3,84.7,true,Leak reversal potential (mV)
+PHOTO,gH,3.1351987203591305,2.7,3.3,false,
+PHOTO,eH,32.0,28.8,35.2,true,Ih reversal potential (mV)
+PHOTO,gKV,2.0797545329825677,1.8,2.2,false,
+PHOTO,eK,74.0,66.6,81.4,true,K+ reversal potential (mV)
+PHOTO,gCa,0.6991466501728102,0.63,0.77,false,
+PHOTO,eCa,12.5,11.25,13.75,true,Ca2+ Nernst factor (mV)
+PHOTO,_Ca_0,1600.0,1440.0,1760.0,true,Resting calcium concentration (uM)
+PHOTO,gKCa,5.296188071664693,4.5,5.5,false,
+PHOTO,gCl,1.9363925691587065,1.8,2.2,false,
+PHOTO,eCl,20.0,18.0,22.0,true,Cl- reversal potential (mV)
+PHOTO,DCa,6.0e-8,5.4e-8,6.6e-8,true,Calcium diffusion coefficient (m2/s)
+PHOTO,S1,3.14e-8,2.826e-8,3.454e-8,true,Shell surface area (m2)
+PHOTO,DELTA,3.0e-5,2.7e-5,3.3e-5,true,Shell thickness (m)
+PHOTO,V1,3.81e-13,3.429e-13,4.191e-13,true,Shell volume (m3)
+PHOTO,V2,5.24e-13,4.716e-13,5.764e-13,true,Core volume (m3)
+PHOTO,Lb1,0.4314698623769503,0.36,0.44,false,
+PHOTO,Bl,450.00000000000006,450.0,550.0,false,
+PHOTO,Lb2,0.18795204890176856,0.18,0.22,false,
+PHOTO,Hb1,90.0,90.0,110.0,false,
+PHOTO,Bh,270.00000000000006,270.0,330.0,false,
+PHOTO,Hb2,81.00000000000003,81.0,99.0,false,
+PHOTO,J_ex,22.0,18.0,22.0,false,
+PHOTO,Cae,0.01,0.009,0.011,true,Extracellular Ca2+ concentration (mM)
+PHOTO,K_ex,2.1681484781150315,2.07,2.53,false,
+PHOTO,J_ex2,22.0,18.0,22.0,false,
+PHOTO,K_ex2,0.49725595409421014,0.45,0.55,false,
+PHOTO,l2,10.4337959803,8.5367421657,10.4337959803,false,
+PHOTO,h2,0.025345828800000005,0.0253458288,0.0309782352,false,
+PHOTO,k1,871.20001067,712.80000873,871.20001067,false,
+PHOTO,k2,5.5,4.5,5.5,false,
+PHOTO,k3,2.5933175472244816,2.2103290872,2.7015133288,false,
+PHOTO,k4,0.0008077104000000004,0.0008077104,0.0009872016,false,
+PHOTO,k5,0.009,0.009,0.011,false,
+PHOTO,k6,0.0600465591,0.0600465591,0.0733902389,false,
+PHOTO,k7,0.009053422200000003,0.0090534222,0.0110652938,false,
+PHOTO,l3,96.50150112899999,78.955773651,96.501501129,false,
+PHOTO,h3,0.0061739964,0.0061739964,0.0075459956,false,
+PHOTO,tB,161.6931580835664,134.99998227,164.99997833,false,
+PHOTO,tM,858.8775504709993,757.34830188,925.64792452,false,
+PHOTO,tC,37708.506338602725,32312.791242,39493.411518,false,
+PHOTO,tO,75.01976016052748,72.052000704,88.063556416,false,
+PHOTO,alpha_Glu,1.0078549146151468,0.9,1.1,false,
+PHOTO,V_Glu_half,-49.5,-49.5,-40.5,false,
+PHOTO,V_Glu_slope,1.4919861539838224,1.35,1.65,false,
+PHOTO,a_Glu,0.8132734384159864,0.72,0.88,false,
+PHOTO,tau_Glu,43.99999999999999,36.0,44.0,false,
+RPE,tau_RPE,3000.0,2700.0,3300.0,false,
+RPE,I_app,0.0,0.0,0.0,true,Applied current (pA)
+RPE,g_K_apical,5.0,4.5,5.5,false,
+RPE,g_Cl_baso,2.0,1.8,2.2,false,
+RPE,g_L_RPE,0.5,0.45,0.55,false,
+RPE,E_Cl,-50.0,-55.0,-45.0,true,Cl- reversal potential (mV)
+RPE,E_L_RPE,-60.0,-66.0,-54.0,true,Leak reversal potential (mV)
+RPE,K_sub_rest,3.0,2.7,3.3,true,Resting subretinal K+ (mM)
+RPE,k_RPE,0.0005,0.00045,0.00055,false,
+RPE,alpha_K_RPE,0.001,0.0009,0.0011,false,
+RPE,K_i,140.0,126.0,154.0,true,Intracellular K+ concentration (mM)

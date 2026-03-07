@@ -12,12 +12,27 @@ println("=" ^ 70)
 
 #%% 1) Load real BaCl+LAP4 ERG data via ElectroPhysiology.jl ────────────────
 response_window = (0.5, 1.5)
-
+t_post = 6.0   
 erg_dir = raw"F:\ERG\Retinoschisis\2019_03_12_AdultWT\Mouse1_Adult_WT\BaCl_LAP4\Rods"
 erg_files = parseABF(erg_dir)
-real_dataset = openERGData(erg_files,t_post = 6.0)
+real_dataset = openERGData(erg_files, t_post = 9.74)
+real_dataset.t[end]
+dt = real_t[1][2] - real_t[1][1]
 
-#Extract traces from ElectroPhysiology types into plain vectors ────────
+stimulus_intensity_levels = map(parse_stimulus_name, real_dataset.HeaderDict["abfPath"])
+intensity_levels = map(calculate_photons, real_dataset.HeaderDict["abfPath"])
+sorted_idx = sortperm(intensity_levels)
+
+intensity_levels = intensity_levels[sorted_idx]
+stimulus_intensity_levels = stimulus_intensity_levels[sorted_idx]
+
+#I think stimulus durations can simply be subtracted
+stimulus_ends = round.(getStimulusEndTime(real_dataset), digits = 4) #Everything is aligned to the same timebase
+
+stimulus_model = map((x, y) -> (intensity = nd_filter(percent_to_photons_eq(x.percent), x.nd), duration = y), stimulus_intensity_levels, stimulus_ends)
+
+real_dataset.data_array = real_dataset.data_array[sorted_idx, :, :]
+real_dataset.t
 n_sweeps = eachtrial(real_dataset) |> length
 real_traces = Vector{Vector{Float64}}(undef, n_sweeps)
 real_t = Vector{Vector{Float64}}(undef, n_sweeps)
@@ -27,7 +42,7 @@ for (i, sweep) in enumerate(eachtrial(real_dataset))
     t = sweep.t
     y = sweep.data_array[1,:,1] * 1000.0
     # println(sweep.HeaderDict)
-    y .-= y[1] #baseline subtract
+    # y .-= y[1] #baseline subtract
     real_traces[i] = y
     real_t[i] = t
     first_peak_idx = findfirst(t .>= response_window[1])
@@ -35,21 +50,12 @@ for (i, sweep) in enumerate(eachtrial(real_dataset))
     real_amp[i] = -minimum(y[first_peak_idx:last_peak_idx])
 end
 
-dt = real_t[1][2] - real_t[1][1]
-
-#%% 2) Parse stimulus info (this section goes away with ElectroPhysiology update)
-
-stimulus_intensity_levels = map(parse_stimulus_name, real_dataset.HeaderDict["abfPath"])
-intensity_levels = map(calculate_photons, real_dataset.HeaderDict["abfPath"])
-sorted_idx = sortperm(intensity_levels)
-
-intensity_levels = intensity_levels[sorted_idx]
-stimulus_intensity_levels = stimulus_intensity_levels[sorted_idx]
-
-#Stimuli for model
-stimulus_model = map(x -> (duration = x.flash_duration, intensity = nd_filter(percent_to_photons_eq(x.percent), x.nd)), stimulus_intensity_levels)
-real_dataset.data_array = real_dataset.data_array[sorted_idx, :, :]
-
+fig = Figure(size=(800, 400))
+ax = Axis(fig[1, 1], xlabel="Time (ms)", ylabel="ERG")
+for i in 1:n_sweeps
+    lines!(ax, real_t[i], real_traces[i], label="")
+end
+display(fig)
 
 # -----------------------------------------------------------------------------
 #%% 3) Build model + parameter set for BaCl+LAP4-like blocked components
@@ -60,7 +66,8 @@ real_dataset.data_array = real_dataset.data_array[sorted_idx, :, :]
 # - OFF bipolar signaling blocked via iGluR conductance.
 # - Müller glia component blocked (BaCl-like) via Kir conductances.
 # -----------------------------------------------------------------------------
-params_dict = load_all_params(editable = true)
+load_param_fn = joinpath(@__DIR__, "checkpoints", "fit_checkpoint_nelder_mead_best.csv")
+params_dict = load_all_params(csv_path = load_param_fn, editable = true)
 
 params_dict[:ONBC][:g_TRPM1] = 0.0
 params_dict[:OFFBC][:g_iGluR] = 0.0
@@ -69,12 +76,13 @@ params_dict[:MULLER][:g_Kir_stalk] = 0.0
 
 params = dict_to_namedtuple(params_dict)
 
-model, u0 = default_build_column()
+col_path = joinpath(@__DIR__, "structure", "photoreceptor_column.json")
+model, u0 = load_mapping(col_path)
 
 println("Cells in model: ", ordered_cells(model))
 println("Total states: ", length(u0))
 
-u0 = dark_adapt(model, u0, params; time = 2000.0, abstol=1e-6, reltol=1e-4)
+u0 = dark_adapt(model, u0, params; abstol=1e-6, reltol=1e-4)
 
 #%% 4) IR protocol and ERG extraction for each flash intensity
 
@@ -85,20 +93,14 @@ solutions = Vector{Any}(undef, length(intensity_levels))
 erg_traces = Vector{Vector{Float64}}(undef, length(intensity_levels))
 peak_amp = fill(NaN, length(intensity_levels))
 
-tspan = (0.0, 6.0)
+tspan = (0.0, real_dataset.t[end])
 dt = 0.01
 t_rng = tspan[1]:dt:tspan[2]
 
 stimulus_model
 t, erg_traces, solutions, peak_amp = simulate_erg(model, u0, params, stimulus_model; tspan=tspan, dt=dt);
 
-erg_traces
-
-size(t_rng)
-size(real_t[1])
-
 #%% Calculate the residual
-
 # Full-waveform MSE and residuals aligned to the exact MSE indexing strategy.
 trace_mse = RetinalTwin.mean_squared_error(t_rng, erg_traces, real_t, real_traces)
 println("Trace MSE (full waveform): ", trace_mse)
@@ -112,7 +114,7 @@ ir_residual = real_amp .- peak_amp
 
 
 #%% 6) Plot simulated column (left) and real-data column (right)
-fig = Figure(size=(1200, 800))
+ fig = Figure(size=(1200, 800))
 log_intensity_levels = log10.(intensity_levels)
 logI_min, logI_max = extrema(log_intensity_levels)
 trace_cmap = cgrad(:viridis)
@@ -128,7 +130,7 @@ ax_sim_trace = Axis(
 )
 for (i, I) in enumerate(intensity_levels)
     lines!(ax_sim_trace, t_rng, erg_traces[i], color=trace_colors[i], linewidth=2.0, label="I=$(I)")
-    vspan!(ax_sim_trace, stim_start, stim_start + stimulus_intensity_levels[i][2]/1000.0, color=(:gold, 0.15))
+    vspan!(ax_sim_trace, stim_start, stim_start + stimulus_intensity_levels[i][2]/10.0, color=(:gold, 0.15))
 end
 # axislegend(ax_sim_trace, position=:rb)
 
@@ -164,7 +166,7 @@ ax_real_trace = Axis(
 )
 for i in 1:n_sweeps
     lines!(ax_real_trace, real_t[i], real_traces[i], color=trace_colors[i], linewidth=2.0, label="")
-    vspan!(ax_real_trace, stim_start, stim_start + stimulus_intensity_levels[i][2]/1000.0, color=(:gold, 0.15))
+    vspan!(ax_real_trace, stim_start, stim_start + stimulus_intensity_levels[i][2]/10.0, color=(:gold, 0.15))
 end
 # axislegend(ax_real_trace, position=:rb)
 
@@ -227,6 +229,10 @@ ax_ir_resid = Axis(
 lines!(ax_ir_resid, intensity_levels, ir_residual, color=:red, linewidth=2.5)
 scatter!(ax_ir_resid, intensity_levels, ir_residual, color=:red, markersize=8)
 # hline!(ax_ir_resid, [0.0], color=(:black, 0.4), linewidth=1.0, linestyle=:dash)
+
+linkxaxes!(ax_sim_ir, ax_real_ir, ax_ir_resid)
+linkxaxes!(ax_sim_trace, ax_real_trace, ax_trace_resid)
+
 
 #save the figure
 save(joinpath(@__DIR__, "plots", "awave_ir_sim_vs_real.png"), fig)

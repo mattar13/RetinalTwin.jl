@@ -16,6 +16,8 @@
 # ============================================================
 
 using Optim
+using CMAEvolutionStrategy
+using Statistics: mean
 using DataFrames
 using CairoMakie
 import DifferentialEquations
@@ -172,7 +174,7 @@ function erg_loss(
     params = unpack_params(theta, base_params, fit_list)
 
     # Dark adapt with current params
-    u0_dark = dark_adapt(model, u0, params; time = 2000.0, abstol=1e-6, reltol=1e-4)
+    u0_dark = dark_adapt(model, u0, params; time = 2000.0, abstol=1e-8, reltol=1e-6)
     t_sim, sim_traces = simulate_erg(model, u0_dark, params, stimuli; tspan=tspan, dt=dt, verbose=false)
     return mean_squared_error(t_sim, sim_traces, real_t, real_traces)
 end
@@ -196,6 +198,7 @@ function _make_tracked_objective(
 )
     eval_count = Ref(0)
     best_loss = Ref(Inf)
+    best_loss_at_last_print = Ref(Inf)
     best_theta = Ref(Float64[])
     t_start = time()
     function tracked(theta)
@@ -208,10 +211,13 @@ function _make_tracked_objective(
         n = eval_count[]
         if n % every == 0
             elapsed = round(time() - t_start, digits=1)
+            Δ = best_loss_at_last_print[] - best_loss[]
+            best_loss_at_last_print[] = best_loss[]
             println(
                 "  [$phase_name] eval=$n  " *
                 "loss=$(round(loss, sigdigits=6))  " *
                 "best=$(round(best_loss[], sigdigits=6))  " *
+                "Δbest=$(round(Δ, sigdigits=3))  " *
                 "elapsed=$(elapsed)s"
             )
             flush(stdout)
@@ -239,9 +245,10 @@ Fit ERG model parameters to real data using staged optimization.
 - `real_t`: Vector of time vectors (one per intensity), from ElectroPhysiology.jl
 - `real_traces`: Vector of trace vectors (one per intensity)
 - `time_window`: retained for backward compatibility; currently ignored
-- `optimizer`: Phase 1 optimizer — `:nelder_mead` (default), `:particle_swarm`, or `:samin`
-- `n_particles`: particle count for PSO (default `3 * n_params`; note PSO evaluates all particles per iteration, making it slow for expensive ODE objectives)
-- `phase1_iterations`: Phase 1 iterations (default 500)
+- `optimizer`: Phase 1 optimizer — `:cma_es` (default), `:nelder_mead`, `:particle_swarm`, or `:samin`
+- `n_particles`: particle count for PSO (default `3 * n_params`)
+- `cma_sigma0`: CMA-ES initial step size (default: auto from bounds, ~1/4 mean search range)
+- `phase1_iterations`: Phase 1 max iterations/generations (default 500)
 - `lbfgs_iterations`: LBFGS iterations (default 100)
 - `run_lbfgs`: whether to run LBFGS refinement phase (default true)
 - `checkpoint_every`: save best-so-far params every N evaluations (default 100; 0 = disabled)
@@ -267,14 +274,15 @@ function fit_erg(
     time_window=(0.5, 1.5),
     tspan=(0.0, 6.0),
     dt=0.01,
-    optimizer::Symbol=:nelder_mead,
+    optimizer::Symbol=:cma_es,
     n_particles::Union{Int,Nothing}=nothing,
+    cma_sigma0::Union{Float64,Nothing}=nothing,
     phase1_iterations=500,
     nm_iterations=nothing,  # deprecated, use phase1_iterations
     lbfgs_iterations=100,
     run_lbfgs=true,
     checkpoint_every::Int=100,
-    checkpoint_dir::String="checkpoints",
+    checkpoint_dir::String="examples/checkpoints",
     show_trace=false,
     verbose=true,
 )
@@ -330,43 +338,86 @@ function fit_erg(
     verbose && println("\nInitial loss: $(round(loss0, sigdigits=6))")
 
     # Phase 1: derivative-free global search
-    # Wrap objective with eval counter so progress (and checkpoints) fire every N evals
-    if optimizer == :particle_swarm
+    # Each branch sets theta_best, p1_loss, p1_converged, p1_iters uniformly.
+    # Objective is wrapped with eval counter for progress + checkpointing.
+    theta_best = copy(theta0)
+    p1_loss = loss0
+    p1_converged = false
+    p1_iters = 0
+
+    if optimizer == :cma_es
+        # CMA-ES: state-of-the-art for N~10-100 black-box optimization.
+        # popsize defaults to 4 + floor(3*log(N)), ~15 for N=50.
+        # sigma0: initial step size — auto from bounds if not specified.
+        sigma0 = something(cma_sigma0, mean(upper_bounds .- lower_bounds) / 4)
+        verbose && println("\n── Phase 1: CMA-ES (max $iters generations, σ₀=$(round(sigma0, sigdigits=3))) ──")
+        obj1 = _make_tracked_objective(objective, "CMA-ES";
+            every=5, checkpoint_every=checkpoint_every, checkpoint_fn=ckpt_fn)
+        res_cma = CMAEvolutionStrategy.minimize(
+            obj1, theta0, sigma0;
+            lower=lower_bounds,
+            upper=upper_bounds,
+            maxiter=iters,
+            ftol=1e-6,
+            verbosity=0,
+        )
+        theta_best   = CMAEvolutionStrategy.xbest(res_cma)
+        p1_loss      = CMAEvolutionStrategy.fbest(res_cma)
+        p1_iters     = res_cma.stop.it
+        p1_converged = res_cma.stop.reason !== :maxiter && res_cma.stop.reason !== :stagnation
+
+    elseif optimizer == :particle_swarm
         np = something(n_particles, 3 * n_params)
         verbose && println("\n── Phase 1: ParticleSwarm ($np particles, $iters iterations) ──")
-        verbose && println("  Note: PSO evaluates all $np particles per iteration before reporting progress.")
         obj1 = _make_tracked_objective(objective, "PSO";
             every=np, checkpoint_every=checkpoint_every, checkpoint_fn=ckpt_fn)
-        res_phase1 = Optim.optimize(
+        res_nm = Optim.optimize(
             obj1, lower_bounds, upper_bounds, theta0,
             ParticleSwarm(n_particles=np),
-            Optim.Options(iterations=iters, show_trace=show_trace, f_reltol=1e-10),
+            Optim.Options(iterations=iters, show_trace=show_trace, f_reltol=1e-6),
         )
+        theta_best   = Optim.minimizer(res_nm)
+        p1_loss      = Optim.minimum(res_nm)
+        p1_converged = Optim.converged(res_nm)
+        p1_iters     = Optim.iterations(res_nm)
+
     elseif optimizer == :samin
         verbose && println("\n── Phase 1: SimulatedAnnealing ($iters iterations) ──")
         obj1 = _make_tracked_objective(objective, "SAMIN";
             every=5, checkpoint_every=checkpoint_every, checkpoint_fn=ckpt_fn)
-        res_phase1 = Optim.optimize(
+        res_nm = Optim.optimize(
             obj1, lower_bounds, upper_bounds, theta0,
             SAMIN(),
             Optim.Options(iterations=iters, show_trace=show_trace),
         )
+        theta_best   = Optim.minimizer(res_nm)
+        p1_loss      = Optim.minimum(res_nm)
+        p1_converged = Optim.converged(res_nm)
+        p1_iters     = Optim.iterations(res_nm)
+
     elseif optimizer == :nelder_mead
         verbose && println("\n── Phase 1: NelderMead ($iters iterations) ──")
         obj1 = _make_tracked_objective(objective, "NelderMead";
             every=5, checkpoint_every=checkpoint_every, checkpoint_fn=ckpt_fn)
-        res_phase1 = Optim.optimize(
+        res_nm = Optim.optimize(
             obj1, theta0, NelderMead(),
-            Optim.Options(iterations=iters, show_trace=show_trace, f_reltol=1e-10, x_reltol=1e-8),
+            Optim.Options(iterations=iters, show_trace=show_trace,
+                f_reltol=1e-6, f_abstol=1e-12,
+                x_reltol=1e-4, x_abstol=1e-10),
         )
+        theta_best   = Optim.minimizer(res_nm)
+        p1_loss      = Optim.minimum(res_nm)
+        p1_converged = Optim.converged(res_nm)
+        p1_iters     = Optim.iterations(res_nm)
+
     else
-        error("Unknown optimizer: $optimizer. Use :nelder_mead, :particle_swarm, or :samin")
+        error("Unknown optimizer: $optimizer. Use :cma_es, :nelder_mead, :particle_swarm, or :samin")
     end
-    theta_best = Optim.minimizer(res_phase1)
-    verbose && println("Phase 1 loss: $(round(Optim.minimum(res_phase1), sigdigits=6))")
+    verbose && println("Phase 1 loss: $(round(p1_loss, sigdigits=6))")
 
     # Phase 2: LBFGS — gradient-based refinement near optimum
-    res_lbfgs = nothing
+    lbfgs_loss      = missing
+    lbfgs_converged = missing
     if run_lbfgs
         verbose && println("\n── Phase 2: LBFGS ($(lbfgs_iterations) iterations) ──")
         try
@@ -374,21 +425,25 @@ function fit_erg(
                 every=5, checkpoint_every=checkpoint_every, checkpoint_fn=ckpt_fn)
             res_lbfgs = Optim.optimize(
                 obj2, theta_best, LBFGS(),
-                Optim.Options(iterations=lbfgs_iterations, show_trace=show_trace, f_reltol=1e-12, x_reltol=1e-10),
+                Optim.Options(iterations=lbfgs_iterations, show_trace=show_trace,
+                    f_reltol=1e-8, f_abstol=1e-14,
+                    x_reltol=1e-6, x_abstol=1e-12),
             )
-            theta_best = Optim.minimizer(res_lbfgs)
-            verbose && println("LBFGS loss: $(round(Optim.minimum(res_lbfgs), sigdigits=6))")
-        catch
-            verbose && println("LBFGS failed, using Phase 1 result")
+            theta_best   = Optim.minimizer(res_lbfgs)
+            lbfgs_loss      = Optim.minimum(res_lbfgs)
+            lbfgs_converged = Optim.converged(res_lbfgs)
+            verbose && println("LBFGS loss: $(round(lbfgs_loss, sigdigits=6))")
+        catch e
+            verbose && println("LBFGS failed ($e), using Phase 1 result")
         end
     end
 
     # Reconstruct final params and simulate
     best_params = unpack_params(theta_best, base_params, fit_list)
-    u0_dark = dark_adapt(model, u0, best_params; time=2000.0, abstol=1e-6, reltol=1e-4)
+    u0_dark = dark_adapt(model, u0, best_params; time=2000.0, abstol=1e-8, reltol=1e-6)
     t_sim, sim_traces = simulate_erg(model, u0_dark, best_params, stimuli; tspan=tspan, dt=dt)
 
-    final_loss = res_lbfgs !== nothing ? Optim.minimum(res_lbfgs) : Optim.minimum(res_phase1)
+    final_loss = lbfgs_loss !== missing ? lbfgs_loss : p1_loss
 
     # Uncertainty estimation
     verbose && println("\n── Estimating parameter uncertainty ──")
@@ -396,14 +451,14 @@ function fit_erg(
     verbose && println(unc)
 
     convergence_info = (
-        optimizer = optimizer,
-        phase1_converged = Optim.converged(res_phase1),
-        phase1_iterations = Optim.iterations(res_phase1),
-        phase1_loss = Optim.minimum(res_phase1),
-        lbfgs_converged = res_lbfgs !== nothing ? Optim.converged(res_lbfgs) : missing,
-        lbfgs_loss = res_lbfgs !== nothing ? Optim.minimum(res_lbfgs) : missing,
-        initial_loss = loss0,
-        final_loss = final_loss,
+        optimizer        = optimizer,
+        phase1_converged = p1_converged,
+        phase1_iterations = p1_iters,
+        phase1_loss      = p1_loss,
+        lbfgs_converged  = lbfgs_converged,
+        lbfgs_loss       = lbfgs_loss,
+        initial_loss     = loss0,
+        final_loss       = final_loss,
     )
 
     return (

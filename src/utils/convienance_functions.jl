@@ -54,7 +54,7 @@ function simulate_erg(model, u0_dark, params, stimuli;
     for (i, s) in enumerate(stimuli)
         stim = make_uniform_flash_stimulus(
             stim_start=stim_start,
-            stim_end=stim_start + s.duration/1000.0,
+            stim_end=stim_start + s.duration/10.0,
             photon_flux=s.intensity,
         )
 
@@ -62,7 +62,7 @@ function simulate_erg(model, u0_dark, params, stimuli;
         sol = DifferentialEquations.solve(
             prob, DifferentialEquations.Rodas5();
             tstops=[stim_start, stim_start + s.duration/1000.0],
-            abstol=1e-6, reltol=1e-4,
+            abstol=1e-8, reltol=1e-6,
         )
         
         t_erg, erg = compute_field_potential(model, params, sol; dt=dt)
