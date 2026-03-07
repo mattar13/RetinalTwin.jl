@@ -285,7 +285,7 @@ RetinalTwin.jl/
 2. Fit RetinalTwin.jl parameters via Bayesian inference
 3. Model predicts most likely genetic/pharmacological perturbations
 4. Validate predictions against:
-   - scRNA-seq data (Blackshaw lab)
+   - scRNA-seq data
    - CRISPR knockout phenotypes
    - Clinical outcomes
 
