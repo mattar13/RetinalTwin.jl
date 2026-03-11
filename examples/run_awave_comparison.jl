@@ -16,8 +16,8 @@ t_post = 6.0
 erg_dir = raw"F:\ERG\Retinoschisis\2019_03_12_AdultWT\Mouse1_Adult_WT\BaCl_LAP4\Rods"
 erg_files = parseABF(erg_dir)
 real_dataset = openERGData(erg_files, t_post = 9.74)
-real_dataset.t[end]
-dt = real_t[1][2] - real_t[1][1]
+real_t = real_dataset.t
+dt = real_t[2] - real_t[1]
 
 stimulus_intensity_levels = map(parse_stimulus_name, real_dataset.HeaderDict["abfPath"])
 intensity_levels = map(calculate_photons, real_dataset.HeaderDict["abfPath"])
