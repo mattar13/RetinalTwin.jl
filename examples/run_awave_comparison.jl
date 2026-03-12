@@ -19,36 +19,13 @@ real_dataset = openERGData(erg_files, t_post = 9.74)
 real_t = real_dataset.t
 dt = real_t[2] - real_t[1]
 
-stimulus_intensity_levels = map(parse_stimulus_name, real_dataset.HeaderDict["abfPath"])
-intensity_levels = map(calculate_photons, real_dataset.HeaderDict["abfPath"])
-sorted_idx = sortperm(intensity_levels)
+stimulus_table = ElectroPhysiology.stimulus_to_table(real_dataset)
+save_stimulus_csv(joinpath(@__DIR__, "inputs", "stimulus_table.csv"), real_dataset)
 
-intensity_levels = intensity_levels[sorted_idx]
-stimulus_intensity_levels = stimulus_intensity_levels[sorted_idx]
-
-#I think stimulus durations can simply be subtracted
-stimulus_ends = round.(getStimulusEndTime(real_dataset), digits = 4) #Everything is aligned to the same timebase
-
-stimulus_model = map((x, y) -> (intensity = nd_filter(percent_to_photons_eq(x.percent), x.nd), duration = y), stimulus_intensity_levels, stimulus_ends)
-
-real_dataset.data_array = real_dataset.data_array[sorted_idx, :, :]
-real_dataset.t
-n_sweeps = eachtrial(real_dataset) |> length
-real_traces = Vector{Vector{Float64}}(undef, n_sweeps)
-real_t = Vector{Vector{Float64}}(undef, n_sweeps)
-real_amp = fill(NaN, n_sweeps)
-
-for (i, sweep) in enumerate(eachtrial(real_dataset))
-    t = sweep.t
-    y = sweep.data_array[1,:,1] * 1000.0
-    # println(sweep.HeaderDict)
-    # y .-= y[1] #baseline subtract
-    real_traces[i] = y
-    real_t[i] = t
-    first_peak_idx = findfirst(t .>= response_window[1])
-    last_peak_idx = findfirst(t .>= response_window[2])
-    real_amp[i] = -minimum(y[first_peak_idx:last_peak_idx])
-end
+# Load the stimulus model from the saved CSV
+stimulus_model = load_stimulus_table(joinpath(@__DIR__, "inputs", "stimulus_table.csv"))
+intensity_levels = [s.intensity for s in stimulus_model]
+n_sweeps = length(stimulus_model)
 
 fig = Figure(size=(800, 400))
 ax = Axis(fig[1, 1], xlabel="Time (ms)", ylabel="ERG")
@@ -66,7 +43,7 @@ display(fig)
 # - OFF bipolar signaling blocked via iGluR conductance.
 # - Müller glia component blocked (BaCl-like) via Kir conductances.
 # -----------------------------------------------------------------------------
-load_param_fn = joinpath(@__DIR__, "checkpoints", "fit_checkpoint_nelder_mead_best.csv")
+load_param_fn = joinpath(@__DIR__, "inputs", "retinal_params.csv")
 params_dict = load_all_params(csv_path = load_param_fn, editable = true)
 
 params_dict[:ONBC][:g_TRPM1] = 0.0
@@ -76,7 +53,7 @@ params_dict[:MULLER][:g_Kir_stalk] = 0.0
 
 params = dict_to_namedtuple(params_dict)
 
-col_path = joinpath(@__DIR__, "structure", "photoreceptor_column.json")
+col_path = joinpath(@__DIR__, "inputs", "photoreceptor_column.json")
 model, u0 = load_mapping(col_path)
 
 println("Cells in model: ", ordered_cells(model))
@@ -97,7 +74,6 @@ tspan = (0.0, real_dataset.t[end])
 dt = 0.01
 t_rng = tspan[1]:dt:tspan[2]
 
-stimulus_model
 t, erg_traces, solutions, peak_amp = simulate_erg(model, u0, params, stimulus_model; tspan=tspan, dt=dt);
 
 #%% Calculate the residual
@@ -130,7 +106,7 @@ ax_sim_trace = Axis(
 )
 for (i, I) in enumerate(intensity_levels)
     lines!(ax_sim_trace, t_rng, erg_traces[i], color=trace_colors[i], linewidth=2.0, label="I=$(I)")
-    vspan!(ax_sim_trace, stim_start, stim_start + stimulus_intensity_levels[i][2]/10.0, color=(:gold, 0.15))
+    vspan!(ax_sim_trace, stim_start, stim_start + stimulus_model[i].duration / 10.0, color=(:gold, 0.15))
 end
 # axislegend(ax_sim_trace, position=:rb)
 
@@ -166,7 +142,7 @@ ax_real_trace = Axis(
 )
 for i in 1:n_sweeps
     lines!(ax_real_trace, real_t[i], real_traces[i], color=trace_colors[i], linewidth=2.0, label="")
-    vspan!(ax_real_trace, stim_start, stim_start + stimulus_intensity_levels[i][2]/10.0, color=(:gold, 0.15))
+    vspan!(ax_real_trace, stim_start, stim_start + stimulus_model[i].duration / 10.0, color=(:gold, 0.15))
 end
 # axislegend(ax_real_trace, position=:rb)
 
