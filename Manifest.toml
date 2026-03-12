@@ -1,6 +1,6 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.5"
+julia_version = "1.11.1"
 manifest_format = "2.0"
 project_hash = "0bf5b2cb69cdbd2306c15a3990055f13561073b9"
 
@@ -758,9 +758,9 @@ version = "2.2.4+0"
 
 [[deps.ElectroPhysiology]]
 deps = ["Dates", "FileIO", "ImageMagick", "Images", "OffsetArrays", "Polynomials", "ProgressMeter", "Requires", "Statistics"]
-git-tree-sha1 = "83e936fa63fbd7ad263e30197a8da1aad4ae1b19"
+git-tree-sha1 = "e68984e16747e1db74c602701822bf9d2d2967e7"
 uuid = "da7a9670-f599-43ac-b818-143f8bf87d45"
-version = "0.5.55"
+version = "0.5.56"
 
 [[deps.EnumX]]
 git-tree-sha1 = "c49898e8438c828577f04b92fc9368c388ac783c"
@@ -2089,7 +2089,7 @@ version = "2.5.5+0"
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.5+0"
+version = "0.8.1+2"
 
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]

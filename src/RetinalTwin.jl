@@ -81,8 +81,10 @@ export dark_adapt, simulate_erg
 # --- Stimulus protocols ---
 include("stimulus_protocols/single_flash.jl")
 include("stimulus_protocols/stimulus_protocols.jl")
+include("stimulus_protocols/load_stimulus.jl")
 export single_flash, uniform_flash, spatial_stimulus
 export make_uniform_flash_stimulus, exponential_spot_stimulus, make_exponential_spot_stimulus
+export load_stimulus_table
 
 # --- Fitting ---
 include("fitting/fitting.jl")
