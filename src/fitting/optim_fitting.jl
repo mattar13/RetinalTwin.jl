@@ -182,13 +182,14 @@ end
 # ── Progress tracking ────────────────────────────────────────
 
 """
-    _make_tracked_objective(objective, phase_name; every=5, checkpoint_every=0, checkpoint_fn=nothing)
+    _make_tracked_objective(objective, phase_name; every, checkpoint_every, checkpoint_fn)
 
-Wrap an objective function with an evaluation counter that:
-- Prints progress every `every` calls
-- Calls `checkpoint_fn(best_theta, eval_n)` every `checkpoint_every` calls (0 = disabled)
+Wrap an objective with eval counting, progress printing, checkpointing,
+and loss history recording.
 
-Tracks the best `theta` seen so far so checkpoints always save the current optimum.
+Returns `(tracked_fn, loss_history)` where `loss_history` is a
+`Vector{NamedTuple{(:eval, :loss, :best_loss, :elapsed), ...}}` that grows
+with every evaluation — even if the optimizer is interrupted or cancelled early.
 """
 function _make_tracked_objective(
     objective, phase_name::String;
@@ -201,6 +202,8 @@ function _make_tracked_objective(
     best_loss_at_last_print = Ref(Inf)
     best_theta = Ref(Float64[])
     t_start = time()
+    loss_history = NamedTuple{(:eval, :loss, :best_loss, :elapsed),
+                              Tuple{Int, Float64, Float64, Float64}}[]
     function tracked(theta)
         loss = objective(theta)
         eval_count[] += 1
@@ -209,8 +212,9 @@ function _make_tracked_objective(
             best_theta[] = copy(theta)
         end
         n = eval_count[]
+        elapsed = time() - t_start
+        push!(loss_history, (eval=n, loss=loss, best_loss=best_loss[], elapsed=elapsed))
         if n % every == 0
-            elapsed = round(time() - t_start, digits=1)
             Δ = best_loss_at_last_print[] - best_loss[]
             best_loss_at_last_print[] = best_loss[]
             println(
@@ -218,7 +222,7 @@ function _make_tracked_objective(
                 "loss=$(round(loss, sigdigits=6))  " *
                 "best=$(round(best_loss[], sigdigits=6))  " *
                 "Δbest=$(round(Δ, sigdigits=3))  " *
-                "elapsed=$(elapsed)s"
+                "elapsed=$(round(elapsed, digits=1))s"
             )
             flush(stdout)
         end
@@ -227,7 +231,7 @@ function _make_tracked_objective(
         end
         return loss
     end
-    return tracked
+    return tracked, loss_history
 end
 
 # ── Main fitting function ────────────────────────────────────
@@ -264,6 +268,8 @@ NamedTuple with fields:
 - `t_sim`: simulation time grid
 - `sim_traces`: fitted simulated traces
 - `convergence`: Optim convergence info
+- `loss_history`: Vector of `(eval, loss, best_loss, elapsed)` NamedTuples for every
+  objective evaluation across all phases — survives interruption/cancellation
 """
 function fit_erg(
     model, u0, base_params::NamedTuple;
@@ -283,6 +289,7 @@ function fit_erg(
     run_lbfgs=true,
     checkpoint_every::Int=100,
     checkpoint_dir::String="examples/checkpoints",
+    checkpoint_files::Dict{String,String}=Dict{String,String}(),
     show_trace=false,
     verbose=true,
 )
@@ -316,16 +323,19 @@ function fit_erg(
         time_window=time_window, tspan=tspan, dt=dt,
     )
 
-    # Build checkpoint closure — saves best params seen so far as a CSV
-    ckpt_path = joinpath(checkpoint_dir, "fit_checkpoint_$(optimizer)_best.csv")
+    # Build checkpoint closure — saves best params + any extra files into a subfolder
     function _do_checkpoint(best_theta, eval_n)
         try
-            mkpath(checkpoint_dir)
+            ckpt_sub = joinpath(checkpoint_dir, "ckpt_$(optimizer)_eval$(eval_n)")
+            mkpath(ckpt_sub)
             save_fitted_params_csv(
                 (params=unpack_params(best_theta, base_params, fit_list), fit_list=fit_list),
-                ckpt_path,
+                joinpath(ckpt_sub, "retinal_params.csv"),
             )
-            verbose && println("  [checkpoint] eval=$eval_n → $ckpt_path")
+            for (src, dst_name) in checkpoint_files
+                isfile(src) && cp(src, joinpath(ckpt_sub, dst_name); force=true)
+            end
+            verbose && println("  [checkpoint] eval=$eval_n → $ckpt_sub")
             flush(stdout)
         catch e
             verbose && println("  [checkpoint] save failed: $e")
@@ -345,70 +355,103 @@ function fit_erg(
     p1_converged = false
     p1_iters = 0
 
+    # Collect loss histories from all phases
+    all_loss_history = NamedTuple{(:eval, :loss, :best_loss, :elapsed),
+                                  Tuple{Int, Float64, Float64, Float64}}[]
+
     if optimizer == :cma_es
-        # CMA-ES: state-of-the-art for N~10-100 black-box optimization.
-        # popsize defaults to 4 + floor(3*log(N)), ~15 for N=50.
-        # sigma0: initial step size — auto from bounds if not specified.
         sigma0 = something(cma_sigma0, mean(upper_bounds .- lower_bounds) / 4)
         verbose && println("\n── Phase 1: CMA-ES (max $iters generations, σ₀=$(round(sigma0, sigdigits=3))) ──")
-        obj1 = _make_tracked_objective(objective, "CMA-ES";
+        obj1, hist1 = _make_tracked_objective(objective, "CMA-ES";
             every=5, checkpoint_every=checkpoint_every, checkpoint_fn=ckpt_fn)
-        res_cma = CMAEvolutionStrategy.minimize(
-            obj1, theta0, sigma0;
-            lower=lower_bounds,
-            upper=upper_bounds,
-            maxiter=iters,
-            ftol=1e-6,
-            verbosity=0,
-        )
-        theta_best   = CMAEvolutionStrategy.xbest(res_cma)
-        p1_loss      = CMAEvolutionStrategy.fbest(res_cma)
-        p1_iters     = res_cma.stop.it
-        p1_converged = res_cma.stop.reason !== :maxiter && res_cma.stop.reason !== :stagnation
+        try
+            res_cma = CMAEvolutionStrategy.minimize(
+                obj1, theta0, sigma0;
+                lower=lower_bounds,
+                upper=upper_bounds,
+                maxiter=iters,
+                ftol=1e-6,
+                verbosity=0,
+            )
+            theta_best   = CMAEvolutionStrategy.xbest(res_cma)
+            p1_loss      = CMAEvolutionStrategy.fbest(res_cma)
+            p1_iters     = res_cma.stop.it
+            p1_converged = res_cma.stop.reason !== :maxiter && res_cma.stop.reason !== :stagnation
+        catch e
+            verbose && println("CMA-ES interrupted ($e), using best seen so far")
+            if !isempty(hist1)
+                p1_loss = hist1[end].best_loss
+            end
+        end
+        append!(all_loss_history, hist1)
 
     elseif optimizer == :particle_swarm
         np = something(n_particles, 3 * n_params)
         verbose && println("\n── Phase 1: ParticleSwarm ($np particles, $iters iterations) ──")
-        obj1 = _make_tracked_objective(objective, "PSO";
+        obj1, hist1 = _make_tracked_objective(objective, "PSO";
             every=np, checkpoint_every=checkpoint_every, checkpoint_fn=ckpt_fn)
-        res_nm = Optim.optimize(
-            obj1, lower_bounds, upper_bounds, theta0,
-            ParticleSwarm(n_particles=np),
-            Optim.Options(iterations=iters, show_trace=show_trace, f_reltol=1e-6),
-        )
-        theta_best   = Optim.minimizer(res_nm)
-        p1_loss      = Optim.minimum(res_nm)
-        p1_converged = Optim.converged(res_nm)
-        p1_iters     = Optim.iterations(res_nm)
+        try
+            res_nm = Optim.optimize(
+                obj1, lower_bounds, upper_bounds, theta0,
+                ParticleSwarm(n_particles=np),
+                Optim.Options(iterations=iters, show_trace=show_trace, f_reltol=1e-6),
+            )
+            theta_best   = Optim.minimizer(res_nm)
+            p1_loss      = Optim.minimum(res_nm)
+            p1_converged = Optim.converged(res_nm)
+            p1_iters     = Optim.iterations(res_nm)
+        catch e
+            verbose && println("PSO interrupted ($e), using best seen so far")
+            if !isempty(hist1)
+                p1_loss = hist1[end].best_loss
+            end
+        end
+        append!(all_loss_history, hist1)
 
     elseif optimizer == :samin
         verbose && println("\n── Phase 1: SimulatedAnnealing ($iters iterations) ──")
-        obj1 = _make_tracked_objective(objective, "SAMIN";
+        obj1, hist1 = _make_tracked_objective(objective, "SAMIN";
             every=5, checkpoint_every=checkpoint_every, checkpoint_fn=ckpt_fn)
-        res_nm = Optim.optimize(
-            obj1, lower_bounds, upper_bounds, theta0,
-            SAMIN(),
-            Optim.Options(iterations=iters, show_trace=show_trace),
-        )
-        theta_best   = Optim.minimizer(res_nm)
-        p1_loss      = Optim.minimum(res_nm)
-        p1_converged = Optim.converged(res_nm)
-        p1_iters     = Optim.iterations(res_nm)
+        try
+            res_nm = Optim.optimize(
+                obj1, lower_bounds, upper_bounds, theta0,
+                SAMIN(),
+                Optim.Options(iterations=iters, show_trace=show_trace),
+            )
+            theta_best   = Optim.minimizer(res_nm)
+            p1_loss      = Optim.minimum(res_nm)
+            p1_converged = Optim.converged(res_nm)
+            p1_iters     = Optim.iterations(res_nm)
+        catch e
+            verbose && println("SAMIN interrupted ($e), using best seen so far")
+            if !isempty(hist1)
+                p1_loss = hist1[end].best_loss
+            end
+        end
+        append!(all_loss_history, hist1)
 
     elseif optimizer == :nelder_mead
         verbose && println("\n── Phase 1: NelderMead ($iters iterations) ──")
-        obj1 = _make_tracked_objective(objective, "NelderMead";
+        obj1, hist1 = _make_tracked_objective(objective, "NelderMead";
             every=5, checkpoint_every=checkpoint_every, checkpoint_fn=ckpt_fn)
-        res_nm = Optim.optimize(
-            obj1, theta0, NelderMead(),
-            Optim.Options(iterations=iters, show_trace=show_trace,
-                f_reltol=1e-6, f_abstol=1e-12,
-                x_reltol=1e-4, x_abstol=1e-10),
-        )
-        theta_best   = Optim.minimizer(res_nm)
-        p1_loss      = Optim.minimum(res_nm)
-        p1_converged = Optim.converged(res_nm)
-        p1_iters     = Optim.iterations(res_nm)
+        try
+            res_nm = Optim.optimize(
+                obj1, theta0, NelderMead(),
+                Optim.Options(iterations=iters, show_trace=show_trace,
+                    f_reltol=1e-6, f_abstol=1e-12,
+                    x_reltol=1e-4, x_abstol=1e-10),
+            )
+            theta_best   = Optim.minimizer(res_nm)
+            p1_loss      = Optim.minimum(res_nm)
+            p1_converged = Optim.converged(res_nm)
+            p1_iters     = Optim.iterations(res_nm)
+        catch e
+            verbose && println("NelderMead interrupted ($e), using best seen so far")
+            if !isempty(hist1)
+                p1_loss = hist1[end].best_loss
+            end
+        end
+        append!(all_loss_history, hist1)
 
     else
         error("Unknown optimizer: $optimizer. Use :cma_es, :nelder_mead, :particle_swarm, or :samin")
@@ -420,9 +463,9 @@ function fit_erg(
     lbfgs_converged = missing
     if run_lbfgs
         verbose && println("\n── Phase 2: LBFGS ($(lbfgs_iterations) iterations) ──")
+        obj2, hist2 = _make_tracked_objective(objective, "LBFGS";
+            every=5, checkpoint_every=checkpoint_every, checkpoint_fn=ckpt_fn)
         try
-            obj2 = _make_tracked_objective(objective, "LBFGS";
-                every=5, checkpoint_every=checkpoint_every, checkpoint_fn=ckpt_fn)
             res_lbfgs = Optim.optimize(
                 obj2, theta_best, LBFGS(),
                 Optim.Options(iterations=lbfgs_iterations, show_trace=show_trace,
@@ -435,6 +478,12 @@ function fit_erg(
             verbose && println("LBFGS loss: $(round(lbfgs_loss, sigdigits=6))")
         catch e
             verbose && println("LBFGS failed ($e), using Phase 1 result")
+        end
+        # Offset LBFGS evals so they continue from phase 1 count
+        p1_evals = isempty(all_loss_history) ? 0 : all_loss_history[end].eval
+        for h in hist2
+            push!(all_loss_history, (eval=h.eval + p1_evals, loss=h.loss,
+                                     best_loss=h.best_loss, elapsed=h.elapsed))
         end
     end
 
@@ -470,6 +519,7 @@ function fit_erg(
         t_sim = t_sim,
         sim_traces = sim_traces,
         convergence = convergence_info,
+        loss_history = all_loss_history,
     )
 end
 
