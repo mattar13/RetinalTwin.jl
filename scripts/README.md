@@ -64,59 +64,51 @@ julia --project scripts/run_simulation.jl \
 
 ### Usage from Python
 
-```python
-import subprocess
-import pandas as pd
+Julia's default startup compiles packages on first use, which is slow for repeated subprocess calls.
+Build a sysimage once to get near-instant startup on every subsequent run:
 
-result = subprocess.run(
-    [
-        "julia", "--project", "scripts/run_simulation.jl",
-        "--structure", "my_inputs/structure.json",
-        "--params",    "my_inputs/retinal_params.csv",
-        "--stimulus",  "my_inputs/stimulus_table.csv",
-        "--depth",     "my_inputs/erg_depth_map.csv",
-        "--tspan",     "0.0,6.0",
-        "--dt",        "0.01",
-        "--outdir",    "results/",
-        "--verbose",
-    ],
-    capture_output=True,
-    text=True,
-    cwd="path/to/RetinalTwin.jl",  # must be the project root
-)
-
-if result.returncode != 0:
-    print("Error:", result.stderr)
-else:
-    # Read the output CSVs
-    traces = pd.read_csv("results/erg_traces.csv")
-    peaks  = pd.read_csv("results/peak_amplitudes.csv")
+```bash
+# One-time build (~5-10 minutes). Only needs to be re-run when packages change.
+julia --project scripts/build_sysimage.jl
 ```
 
-### Reducing Julia Startup Time
+This produces `retinal_twin.dll` (Windows), `.dylib` (macOS), or `.so` (Linux) in the project root.
 
-Julia's first-run compilation can be slow. Two ways to speed up repeated calls:
+```python
+import subprocess
+import platform
+from pathlib import Path
+import pandas as pd
 
-1. **Use a sysimage** (recommended for production):
-   ```bash
-   julia --project -e '
-       using PackageCompiler
-       create_sysimage([:RetinalTwin, :DifferentialEquations, :CSV, :DataFrames, :ArgParse];
-           sysimage_path="retinal_twin.so",
-           precompile_execution_file="scripts/run_simulation.jl")
-   '
-   # Then run with:
-   julia --project --sysimage retinal_twin.so scripts/run_simulation.jl --outdir results/
-   ```
+RETINAL_TWIN_DIR = Path("path/to/RetinalTwin.jl")
 
-2. **Use DaemonMode.jl** for a persistent Julia process:
-   ```bash
-   # Terminal 1: start the daemon
-   julia --project -e 'using DaemonMode; serve()'
+# Pick the right sysimage extension for the platform
+ext = {"Windows": "dll", "Darwin": "dylib"}.get(platform.system(), "so")
+sysimage = RETINAL_TWIN_DIR / f"retinal_twin.{ext}"
 
-   # Terminal 2 (or from Python): send scripts to the running process
-   julia --project -e 'using DaemonMode; runargs()' scripts/run_simulation.jl --outdir results/
-   ```
+cmd = [
+    "julia", "--project",
+    *(["--sysimage", str(sysimage)] if sysimage.exists() else []),
+    "scripts/run_simulation.jl",
+    "--structure", "my_inputs/structure.json",
+    "--params",    "my_inputs/retinal_params.csv",
+    "--stimulus",  "my_inputs/stimulus_table.csv",
+    "--depth",     "my_inputs/erg_depth_map.csv",
+    "--tspan",     "0.0,6.0",
+    "--dt",        "0.01",
+    "--outdir",    "results/",
+    "--verbose",
+]
+
+result = subprocess.run(cmd, capture_output=True, text=True, cwd=RETINAL_TWIN_DIR)
+
+if result.returncode != 0:
+    raise RuntimeError(f"Simulation failed:\n{result.stderr}")
+
+# Read the output CSVs
+traces = pd.read_csv(RETINAL_TWIN_DIR / "results" / "erg_traces.csv")
+peaks  = pd.read_csv(RETINAL_TWIN_DIR / "results" / "peak_amplitudes.csv")
+```
 
 ### Output Files
 
